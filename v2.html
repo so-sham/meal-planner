@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>NourishPlan Pro — Protein-First Meal Planner</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💪</text></svg>"/>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script>
+tailwind.config={theme:{extend:{colors:{
+cream:{50:'#FFFDF9',100:'#FFFBF5',200:'#FFF5E6'},
+forest:{50:'#EFF5F1',100:'#D7E8DB',200:'#A8D4B2',300:'#7BBF8A',400:'#5AAE6A',500:'#4A7C59',600:'#3D6649',700:'#2F4F39'},
+spice:{50:'#FFF4EB',100:'#FFE4CC',200:'#FFC999',300:'#FFAD66',400:'#FF9233',500:'#E8913A',600:'#CC7A20',700:'#995B18'},
+bark:{50:'#F5EDE8',100:'#E6D5CB',200:'#C9A892',300:'#AD7B5A',400:'#8B5E3C',500:'#6B4528',600:'#4A2F1B',700:'#2D1810'},
+pro:{50:'#F0F4FF',100:'#D9E4FF',200:'#A3BFFF',300:'#6B9AFF',400:'#3B76FF',500:'#1D5CFF',600:'#0044E0'},
+},fontFamily:{sans:['Inter','system-ui','sans-serif']}}}}
+</script>
+<style>
+body{font-family:'Inter',system-ui,sans-serif;background:#FFFBF5;color:#2D1810;-webkit-font-smoothing:antialiased}
+.scrollbar-hide::-webkit-scrollbar{display:none}.scrollbar-hide{-ms-overflow-style:none;scrollbar-width:none}
+@keyframes fadeInUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes scaleIn{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes pulse2{0%,100%{opacity:1}50%{opacity:.6}}
+.anim-fiu{animation:fadeInUp .4s ease-out both}
+.anim-fi{animation:fadeIn .3s ease-out both}
+.anim-si{animation:scaleIn .3s ease-out both}
+.st1{animation-delay:.05s}.st2{animation-delay:.1s}.st3{animation-delay:.15s}.st4{animation-delay:.2s}.st5{animation-delay:.25s}
+.shimmer{background:linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%);background-size:200% 100%;animation:shimmer 1.5s infinite}
+.pulse2{animation:pulse2 2s ease-in-out infinite}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;height:20px;width:20px;border-radius:50%;background:#4A7C59;cursor:pointer;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+input[type=range]{-webkit-appearance:none;height:8px;border-radius:8px;background:#FFF5E6;outline:none}
+.protein-glow{box-shadow:0 0 20px rgba(74,124,89,.15)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-type="module">
+const{useState,useEffect,useRef,useCallback,useMemo}=React;
+
+// ════════════════════════════════════════════════════════════════
+// DATA: CUISINES
+// ════════════════════════════════════════════════════════════════
+const CUISINES=[
+  {id:'indian-roti',label:'Indian — Roti',emoji:'🍛'},
+  {id:'indian-rice',label:'Indian — Rice',emoji:'🍚'},
+  {id:'indian-millet',label:'Indian — Millet',emoji:'🌾'},
+  {id:'south-indian',label:'South Indian',emoji:'🥘'},
+  {id:'italian',label:'Italian',emoji:'🍝'},
+  {id:'mediterranean',label:'Mediterranean',emoji:'🥙'},
+  {id:'mexican',label:'Mexican',emoji:'🌮'},
+  {id:'asian',label:'Asian',emoji:'🍜'},
+  {id:'continental',label:'Continental',emoji:'🍞'},
+  {id:'salad-bowl',label:'Salad / Bowls',emoji:'🥗'},
+  {id:'mixed',label:'Mixed / Surprise',emoji:'🔀'},
+];
+const CE=Object.fromEntries(CUISINES.map(c=>[c.id,c.emoji]));
+
+// ════════════════════════════════════════════════════════════════
+// DATA: 220 MEALS (compact)
+// Fields: id,n=name,d=desc,c=cuisine,t=types,v=isVeg,e=hasEgg,cal,p=protein,cb=carbs,f=fat,s=serving,ig=ingredients,tg=tags,dairy=hasDairy,soy=hasSoy
+// ════════════════════════════════════════════════════════════════
+const M=[
+  // INDIAN ROTI (15)
+  {id:1,n:"Dal Tadka with Roti",d:"Yellow lentils tempered with cumin & ghee, 2 rotis and sabzi",c:"indian-roti",t:["lunch","dinner"],v:1,e:0,cal:380,p:14,cb:52,f:10,s:"2 rotis + 1 cup dal + ½ cup sabzi",ig:["toor dal","wheat flour","ghee","mixed vegetables","cumin","garlic"],tg:["high-fiber","comfort-food"],dairy:1,soy:0},
+  {id:2,n:"Paneer Butter Masala with Roti",d:"Creamy tomato paneer curry with butter rotis",c:"indian-roti",t:["lunch","dinner"],v:1,e:0,cal:520,p:20,cb:42,f:28,s:"2 rotis + 1 cup paneer curry",ig:["paneer","tomato","cream","butter","wheat flour","spices"],tg:["high-protein","rich"],dairy:1,soy:0},
+  {id:3,n:"Chole with Roti",d:"Spiced chickpea curry with 2 rotis, onion & lemon",c:"indian-roti",t:["lunch","dinner"],v:1,e:0,cal:420,p:16,cb:55,f:14,s:"2 rotis + 1 cup chole",ig:["chickpeas","onion","tomato","wheat flour","spices"],tg:["high-fiber","meal-prep-friendly"],dairy:0,soy:0},
+  {id:4,n:"Rajma with Roti",d:"Kidney bean curry in thick gravy with 2 rotis",c:"indian-roti",t:["lunch","dinner"],v:1,e:0,cal:400,p:15,cb:54,f:12,s:"2 rotis + 1 cup rajma",ig:["kidney beans","onion","tomato","wheat flour","spices"],tg:["high-fiber","comfort-food"],dairy:0,soy:0},
+  {id:5,n:"Aloo Gobi with Roti",d:"Dry potato-cauliflower sabzi with 2 rotis",c:"indian-roti",t:["lunch","dinner"],v:1,e:0,cal:350,p:10,cb:48,f:12,s:"2 rotis + 1 cup aloo gobi",ig:["potato","cauliflower","wheat flour","cumin","turmeric"],tg:["comfort-food","quick"],dairy:0,soy:0},
+  {id:6,n:"Palak Paneer with Roti",d:"Creamy spinach curry with paneer, 2 rotis",c:"indian-roti",t:["lunch","dinner"],v:1,e:0,cal:450,p:20,cb:40,f:22,s:"2 rotis + 1 cup palak paneer",ig:["spinach","paneer","cream","wheat flour","spices"],tg:["high-protein","iron-rich"],dairy:1,soy:0},
+  {id:7,n:"Egg Bhurji with Roti",d:"Spiced scrambled eggs with onion, tomato, 2 rotis",c:"indian-roti",t:["breakfast","lunch"],v:0,e:1,cal:380,p:18,cb:32,f:18,s:"2 rotis + 2 egg bhurji",ig:["eggs","onion","tomato","green chili","wheat flour"],tg:["high-protein","quick"],dairy:0,soy:0},
+  {id:8,n:"Chicken Curry with Roti",d:"Home-style chicken curry with 2 rotis",c:"indian-roti",t:["lunch","dinner"],v:0,e:0,cal:480,p:32,cb:38,f:20,s:"2 rotis + 1 cup chicken curry",ig:["chicken","onion","tomato","wheat flour","spices","yogurt"],tg:["high-protein","comfort-food"],dairy:1,soy:0},
+  {id:9,n:"Butter Chicken with Roti",d:"Rich creamy butter chicken with soft rotis",c:"indian-roti",t:["lunch","dinner"],v:0,e:0,cal:550,p:34,cb:40,f:26,s:"2 rotis + 1 cup butter chicken",ig:["chicken","tomato","cream","butter","wheat flour","kasuri methi"],tg:["high-protein","rich"],dairy:1,soy:0},
+  {id:10,n:"Keema with Roti",d:"Spiced minced meat with peas, 2 rotis",c:"indian-roti",t:["lunch","dinner"],v:0,e:0,cal:500,p:30,cb:36,f:24,s:"2 rotis + 1 cup keema",ig:["minced chicken","peas","onion","wheat flour","garam masala"],tg:["high-protein"],dairy:0,soy:0},
+  {id:11,n:"Stuffed Paratha with Curd",d:"Aloo paratha with curd and pickle",c:"indian-roti",t:["breakfast"],v:1,e:0,cal:380,p:12,cb:45,f:16,s:"2 parathas + ½ cup curd + pickle",ig:["wheat flour","potato","curd","pickle","spices"],tg:["comfort-food","filling"],dairy:1,soy:0},
+  {id:12,n:"Methi Thepla with Pickle",d:"Gujarati fenugreek flatbread with pickle and curd",c:"indian-roti",t:["breakfast"],v:1,e:0,cal:320,p:10,cb:40,f:12,s:"3 theplas + pickle + curd",ig:["wheat flour","fenugreek leaves","curd","pickle","spices"],tg:["quick","meal-prep-friendly"],dairy:1,soy:0},
+  {id:13,n:"Paneer Tikka Roti Plate",d:"Tandoori paneer tikka with mint chutney and 2 rotis",c:"indian-roti",t:["lunch","dinner"],v:1,e:0,cal:480,p:24,cb:40,f:24,s:"2 rotis + 6 pcs paneer tikka",ig:["paneer","bell peppers","yogurt","wheat flour","mint","spices"],tg:["high-protein","grilled"],dairy:1,soy:0},
+  {id:14,n:"Mixed Dal with Roti",d:"Five-lentil dal with 2 rotis and salad",c:"indian-roti",t:["lunch","dinner"],v:1,e:0,cal:360,p:16,cb:50,f:8,s:"2 rotis + 1 cup mixed dal + salad",ig:["toor dal","moong dal","masoor dal","wheat flour","spices"],tg:["high-protein","high-fiber"],dairy:0,soy:0},
+  {id:15,n:"Bhindi Masala with Roti",d:"Crispy okra stir-fry with 2 rotis and dal",c:"indian-roti",t:["lunch","dinner"],v:1,e:0,cal:340,p:10,cb:46,f:12,s:"2 rotis + 1 cup bhindi + ½ cup dal",ig:["okra","onion","wheat flour","toor dal","spices"],tg:["comfort-food","quick"],dairy:0,soy:0},
+  // INDIAN RICE (15)
+  {id:16,n:"Rajma Chawal",d:"Kidney bean curry over steamed basmati rice",c:"indian-rice",t:["lunch","dinner"],v:1,e:0,cal:450,p:16,cb:68,f:10,s:"1.5 cups rice + 1 cup rajma",ig:["kidney beans","basmati rice","onion","tomato","spices"],tg:["comfort-food","high-fiber"],dairy:0,soy:0},
+  {id:17,n:"Chole Chawal",d:"Chickpea curry over rice with papad",c:"indian-rice",t:["lunch","dinner"],v:1,e:0,cal:440,p:15,cb:66,f:12,s:"1.5 cups rice + 1 cup chole + papad",ig:["chickpeas","basmati rice","onion","tomato","spices"],tg:["high-fiber","comfort-food"],dairy:0,soy:0},
+  {id:18,n:"Dal Rice with Ghee",d:"Yellow dal over rice with ghee drizzle",c:"indian-rice",t:["lunch","dinner"],v:1,e:0,cal:420,p:14,cb:62,f:12,s:"1.5 cups rice + 1 cup dal + 1 tsp ghee",ig:["toor dal","basmati rice","ghee","cumin","turmeric"],tg:["comfort-food","simple"],dairy:1,soy:0},
+  {id:19,n:"Chicken Biryani",d:"Layered rice with spiced chicken, saffron, fried onions",c:"indian-rice",t:["lunch","dinner"],v:0,e:0,cal:580,p:30,cb:62,f:22,s:"2 cups biryani + raita",ig:["chicken","basmati rice","yogurt","saffron","fried onions","whole spices"],tg:["high-protein","special-occasion"],dairy:1,soy:0},
+  {id:20,n:"Veg Biryani",d:"Layered rice with vegetables, paneer, and spices",c:"indian-rice",t:["lunch","dinner"],v:1,e:0,cal:420,p:12,cb:60,f:14,s:"2 cups biryani + raita",ig:["basmati rice","mixed vegetables","paneer","saffron","whole spices"],tg:["comfort-food"],dairy:1,soy:0},
+  {id:21,n:"Egg Biryani",d:"Spiced rice with boiled eggs and caramelized onions",c:"indian-rice",t:["lunch","dinner"],v:0,e:1,cal:480,p:20,cb:58,f:18,s:"2 cups biryani + 2 eggs + raita",ig:["eggs","basmati rice","onion","saffron","whole spices"],tg:["high-protein"],dairy:1,soy:0},
+  {id:22,n:"Paneer Pulao",d:"One-pot rice with paneer, peas, and spices",c:"indian-rice",t:["lunch","dinner"],v:1,e:0,cal:460,p:16,cb:56,f:18,s:"2 cups pulao + raita",ig:["paneer","basmati rice","peas","cumin","whole spices"],tg:["comfort-food"],dairy:1,soy:0},
+  {id:23,n:"Jeera Rice with Dal Fry",d:"Cumin rice with spicy dal fry",c:"indian-rice",t:["lunch","dinner"],v:1,e:0,cal:400,p:14,cb:58,f:10,s:"1.5 cups jeera rice + 1 cup dal fry",ig:["basmati rice","toor dal","cumin","garlic","ghee"],tg:["simple","comfort-food"],dairy:1,soy:0},
+  {id:24,n:"Fish Curry with Rice",d:"Tangy fish curry in coconut gravy with rice",c:"indian-rice",t:["lunch","dinner"],v:0,e:0,cal:460,p:28,cb:52,f:14,s:"1.5 cups rice + 1 cup fish curry",ig:["fish","coconut","mustard","basmati rice","curry leaves"],tg:["high-protein","omega-rich"],dairy:0,soy:0},
+  {id:25,n:"Kadhi Chawal",d:"Tangy yogurt curry with pakoras over rice",c:"indian-rice",t:["lunch","dinner"],v:1,e:0,cal:380,p:12,cb:56,f:10,s:"1.5 cups rice + 1 cup kadhi",ig:["yogurt","besan","basmati rice","turmeric","spices"],tg:["comfort-food","tangy"],dairy:1,soy:0},
+  {id:26,n:"Lemon Rice",d:"Tangy lemon rice with peanuts and curry leaves",c:"indian-rice",t:["lunch"],v:1,e:0,cal:350,p:8,cb:55,f:10,s:"2 cups lemon rice",ig:["basmati rice","lemon","peanuts","curry leaves","mustard seeds"],tg:["quick","tangy"],dairy:0,soy:0},
+  {id:27,n:"Sambar Rice",d:"Vegetable sambar over rice with papad",c:"indian-rice",t:["lunch"],v:1,e:0,cal:380,p:12,cb:58,f:8,s:"1.5 cups rice + 1 cup sambar",ig:["toor dal","basmati rice","mixed vegetables","tamarind","sambar powder"],tg:["high-fiber"],dairy:0,soy:0},
+  {id:28,n:"Curd Rice",d:"Cooling yogurt rice with pomegranate",c:"indian-rice",t:["lunch"],v:1,e:0,cal:300,p:8,cb:48,f:8,s:"1.5 cups curd rice",ig:["rice","yogurt","mustard seeds","curry leaves","pomegranate"],tg:["cooling","quick"],dairy:1,soy:0},
+  {id:29,n:"Egg Curry with Rice",d:"Boiled eggs in spiced gravy with rice",c:"indian-rice",t:["lunch","dinner"],v:0,e:1,cal:440,p:18,cb:54,f:16,s:"1.5 cups rice + 2 eggs in curry",ig:["eggs","basmati rice","onion","tomato","spices"],tg:["high-protein","quick"],dairy:0,soy:0},
+  {id:30,n:"Mutton Curry with Rice",d:"Slow-cooked mutton in rich gravy with rice",c:"indian-rice",t:["lunch","dinner"],v:0,e:0,cal:560,p:32,cb:50,f:24,s:"1.5 cups rice + 1 cup mutton curry",ig:["mutton","basmati rice","onion","yogurt","whole spices"],tg:["high-protein","rich"],dairy:1,soy:0},
+  // INDIAN MILLET (12)
+  {id:31,n:"Ragi Dosa with Chutney",d:"Crispy finger millet dosa with coconut chutney and sambar",c:"indian-millet",t:["breakfast"],v:1,e:0,cal:280,p:8,cb:42,f:8,s:"2 dosas + chutney + sambar",ig:["ragi flour","rice flour","coconut","toor dal","spices"],tg:["high-fiber","calcium-rich"],dairy:0,soy:0},
+  {id:32,n:"Bajra Roti with Sabzi",d:"Pearl millet rotis with vegetable sabzi",c:"indian-millet",t:["lunch","dinner"],v:1,e:0,cal:360,p:12,cb:48,f:12,s:"2 bajra rotis + 1 cup sabzi",ig:["bajra flour","mixed vegetables","garlic","ghee","spices"],tg:["high-fiber","gluten-free"],dairy:1,soy:0},
+  {id:33,n:"Jowar Roti with Dal",d:"Sorghum rotis with dal and curd",c:"indian-millet",t:["lunch","dinner"],v:1,e:0,cal:380,p:14,cb:52,f:10,s:"2 jowar rotis + 1 cup dal + curd",ig:["jowar flour","toor dal","curd","ghee","spices"],tg:["high-fiber","gluten-free"],dairy:1,soy:0},
+  {id:34,n:"Ragi Mudde with Sambar",d:"Traditional ragi ball with sambar",c:"indian-millet",t:["lunch","dinner"],v:1,e:0,cal:340,p:10,cb:50,f:8,s:"2 ragi mudde + 1 cup sambar",ig:["ragi flour","toor dal","vegetables","tamarind","spices"],tg:["traditional","calcium-rich"],dairy:0,soy:0},
+  {id:35,n:"Millet Khichdi",d:"One-pot millet and moong dal khichdi",c:"indian-millet",t:["lunch","dinner"],v:1,e:0,cal:350,p:12,cb:50,f:8,s:"1.5 cups khichdi + 1 tsp ghee",ig:["foxtail millet","moong dal","ghee","cumin","turmeric"],tg:["one-pot","light"],dairy:1,soy:0},
+  {id:36,n:"Foxtail Millet Upma",d:"Light millet upma with vegetables and peanuts",c:"indian-millet",t:["breakfast"],v:1,e:0,cal:260,p:8,cb:38,f:8,s:"1.5 cups upma",ig:["foxtail millet","onion","peanuts","curry leaves","vegetables"],tg:["quick","light"],dairy:0,soy:0},
+  {id:37,n:"Bajra Khichdi with Buttermilk",d:"Pearl millet khichdi with buttermilk",c:"indian-millet",t:["lunch"],v:1,e:0,cal:380,p:12,cb:52,f:10,s:"1.5 cups khichdi + 1 glass buttermilk",ig:["bajra","moong dal","buttermilk","ghee","cumin"],tg:["traditional","cooling"],dairy:1,soy:0},
+  {id:38,n:"Ragi Porridge",d:"Warm ragi porridge with jaggery and nuts",c:"indian-millet",t:["breakfast"],v:1,e:0,cal:220,p:6,cb:38,f:4,s:"1 bowl",ig:["ragi flour","milk","jaggery","almonds","cardamom"],tg:["calcium-rich","quick"],dairy:1,soy:0},
+  {id:39,n:"Millet Pulao",d:"One-pot millet pulao with vegetables",c:"indian-millet",t:["lunch","dinner"],v:1,e:0,cal:360,p:10,cb:52,f:10,s:"2 cups millet pulao + raita",ig:["little millet","mixed vegetables","whole spices","ghee"],tg:["one-pot","high-fiber"],dairy:1,soy:0},
+  {id:40,n:"Barnyard Millet Pongal",d:"Millet pongal with pepper, cumin, cashews",c:"indian-millet",t:["breakfast"],v:1,e:0,cal:280,p:8,cb:40,f:8,s:"1.5 cups pongal",ig:["barnyard millet","moong dal","black pepper","cashews","ghee"],tg:["comfort-food","warm"],dairy:1,soy:0},
+  {id:41,n:"Little Millet Lemon Rice",d:"Tangy lemon millet with peanuts",c:"indian-millet",t:["lunch"],v:1,e:0,cal:320,p:8,cb:48,f:8,s:"2 cups",ig:["little millet","lemon","peanuts","turmeric","curry leaves"],tg:["quick","tangy"],dairy:0,soy:0},
+  {id:42,n:"Kodo Millet Biryani",d:"Aromatic millet biryani with vegetables",c:"indian-millet",t:["lunch","dinner"],v:1,e:0,cal:380,p:10,cb:54,f:10,s:"2 cups + raita",ig:["kodo millet","mixed vegetables","yogurt","saffron","whole spices"],tg:["high-fiber"],dairy:1,soy:0},
+  // SOUTH INDIAN (15)
+  {id:43,n:"Idli Sambar",d:"Steamed rice cakes (3) with sambar and chutney",c:"south-indian",t:["breakfast"],v:1,e:0,cal:280,p:8,cb:50,f:4,s:"3 idlis + 1 cup sambar + chutney",ig:["rice","urad dal","toor dal","vegetables","coconut"],tg:["light","steamed","low-fat"],dairy:0,soy:0},
+  {id:44,n:"Masala Dosa with Chutney",d:"Crispy crepe with potato filling, chutneys, sambar",c:"south-indian",t:["breakfast"],v:1,e:0,cal:370,p:8,cb:48,f:16,s:"1 masala dosa + chutneys + sambar",ig:["rice","urad dal","potato","onion","coconut","mustard seeds"],tg:["classic","crispy"],dairy:0,soy:0},
+  {id:45,n:"Upma with Chutney",d:"Savory semolina porridge with vegetables",c:"south-indian",t:["breakfast"],v:1,e:0,cal:260,p:6,cb:36,f:10,s:"1.5 cups upma + chutney",ig:["rava","onion","vegetables","cashews","curry leaves"],tg:["quick","light"],dairy:0,soy:0},
+  {id:46,n:"Ven Pongal with Sambar",d:"Rice-lentil pongal with pepper and cashews",c:"south-indian",t:["breakfast"],v:1,e:0,cal:320,p:10,cb:44,f:10,s:"1.5 cups pongal + sambar",ig:["rice","moong dal","black pepper","cumin","cashews","ghee"],tg:["comfort-food"],dairy:1,soy:0},
+  {id:47,n:"Medu Vada Sambar",d:"Crispy urad dal fritters (2) with sambar",c:"south-indian",t:["breakfast"],v:1,e:0,cal:340,p:12,cb:38,f:16,s:"2 vadas + sambar + chutney",ig:["urad dal","curry leaves","toor dal","vegetables","coconut"],tg:["crispy","protein-rich"],dairy:0,soy:0},
+  {id:48,n:"Pesarattu with Chutney",d:"Green moong dal crepe with ginger chutney",c:"south-indian",t:["breakfast"],v:1,e:0,cal:300,p:14,cb:36,f:10,s:"2 pesarattu + chutney",ig:["green moong dal","rice flour","ginger","green chili","cumin"],tg:["high-protein","crispy"],dairy:0,soy:0},
+  {id:49,n:"Uttapam with Chutney",d:"Thick pancake topped with onions and tomatoes",c:"south-indian",t:["breakfast"],v:1,e:0,cal:320,p:8,cb:42,f:12,s:"2 uttapam + chutney",ig:["rice","urad dal","onion","tomato","vegetables","coconut"],tg:["filling"],dairy:0,soy:0},
+  {id:50,n:"Bisi Bele Bath",d:"Karnataka spiced rice with lentils and vegetables",c:"south-indian",t:["lunch","dinner"],v:1,e:0,cal:400,p:12,cb:56,f:12,s:"2 cups + boondi",ig:["rice","toor dal","vegetables","tamarind","ghee"],tg:["one-pot","spicy"],dairy:1,soy:0},
+  {id:51,n:"Curd Rice with Pickle",d:"Cooling yogurt rice with mustard tempering",c:"south-indian",t:["lunch"],v:1,e:0,cal:300,p:8,cb:46,f:8,s:"1.5 cups + pickle",ig:["rice","yogurt","mustard seeds","curry leaves","pomegranate"],tg:["cooling","light"],dairy:1,soy:0},
+  {id:52,n:"Tamarind Rice (Puliyodarai)",d:"Tangy tamarind rice with peanuts",c:"south-indian",t:["lunch"],v:1,e:0,cal:350,p:8,cb:50,f:12,s:"2 cups",ig:["rice","tamarind","peanuts","sesame","curry leaves"],tg:["tangy","meal-prep-friendly"],dairy:0,soy:0},
+  {id:53,n:"Egg Dosa",d:"Crispy dosa with fried egg and chutneys",c:"south-indian",t:["breakfast"],v:0,e:1,cal:380,p:14,cb:40,f:18,s:"1 egg dosa + chutneys",ig:["rice","urad dal","egg","onion","coconut"],tg:["high-protein","crispy"],dairy:0,soy:0},
+  {id:54,n:"Chicken Chettinad with Rice",d:"Fiery Chettinad chicken with rice",c:"south-indian",t:["lunch","dinner"],v:0,e:0,cal:520,p:30,cb:50,f:20,s:"1.5 cups rice + 1 cup chicken",ig:["chicken","rice","black pepper","fennel","coconut"],tg:["high-protein","spicy"],dairy:0,soy:0},
+  {id:55,n:"Fish Fry with Rice & Rasam",d:"Masala fish fry with rasam and rice",c:"south-indian",t:["lunch","dinner"],v:0,e:0,cal:480,p:28,cb:48,f:18,s:"1.5 cups rice + fish fry + rasam",ig:["fish","rice","tamarind","tomato","spices"],tg:["high-protein","omega-rich"],dairy:0,soy:0},
+  {id:56,n:"Appam with Vegetable Stew",d:"Coconut hoppers with mild vegetable stew",c:"south-indian",t:["dinner","breakfast"],v:1,e:0,cal:350,p:10,cb:46,f:12,s:"2 appams + 1 cup stew",ig:["rice flour","coconut milk","vegetables","whole spices"],tg:["light"],dairy:0,soy:0},
+  {id:57,n:"Set Dosa with Chutney Podi",d:"Soft dosas (3) with ghee and podi",c:"south-indian",t:["breakfast"],v:1,e:0,cal:310,p:8,cb:44,f:10,s:"3 set dosas + podi + ghee",ig:["rice","urad dal","ghee","chutney podi","toor dal"],tg:["soft","light"],dairy:1,soy:0},
+  // ITALIAN (12)
+  {id:58,n:"Penne Arrabbiata",d:"Penne in spicy tomato sauce",c:"italian",t:["lunch","dinner"],v:1,e:0,cal:420,p:12,cb:58,f:14,s:"1.5 cups",ig:["penne","tomato","garlic","red chili","olive oil","basil"],tg:["spicy","quick"],dairy:0,soy:0},
+  {id:59,n:"Spaghetti Aglio e Olio",d:"Spaghetti with garlic, olive oil, chili",c:"italian",t:["lunch","dinner"],v:1,e:0,cal:400,p:10,cb:52,f:16,s:"1.5 cups",ig:["spaghetti","garlic","olive oil","chili","parsley","parmesan"],tg:["quick","classic"],dairy:1,soy:0},
+  {id:60,n:"Pasta Primavera",d:"Penne with sauteed seasonal vegetables",c:"italian",t:["lunch","dinner"],v:1,e:0,cal:380,p:12,cb:50,f:14,s:"1.5 cups",ig:["penne","zucchini","bell peppers","cherry tomatoes","olive oil","parmesan"],tg:["light"],dairy:1,soy:0},
+  {id:61,n:"Chicken Pesto Pasta",d:"Fusilli with grilled chicken and basil pesto",c:"italian",t:["lunch","dinner"],v:0,e:0,cal:520,p:28,cb:50,f:22,s:"1.5 cups",ig:["fusilli","chicken breast","basil","pine nuts","parmesan","olive oil"],tg:["high-protein"],dairy:1,soy:0},
+  {id:62,n:"Margherita Pizza (2 slices)",d:"Thin-crust pizza with mozzarella and basil",c:"italian",t:["lunch","dinner"],v:1,e:0,cal:440,p:16,cb:46,f:20,s:"2 medium slices",ig:["pizza dough","mozzarella","tomato sauce","basil","olive oil"],tg:["classic"],dairy:1,soy:0},
+  {id:63,n:"Mushroom Risotto",d:"Creamy arborio rice with mushrooms",c:"italian",t:["lunch","dinner"],v:1,e:0,cal:420,p:10,cb:54,f:16,s:"1.5 cups",ig:["arborio rice","mushrooms","parmesan","white wine","butter"],tg:["comfort-food","creamy"],dairy:1,soy:0},
+  {id:64,n:"Caprese Salad with Bread",d:"Fresh mozzarella, tomato, basil with ciabatta",c:"italian",t:["lunch"],v:1,e:0,cal:350,p:14,cb:28,f:20,s:"1 plate + 2 bread",ig:["mozzarella","tomato","basil","olive oil","ciabatta"],tg:["light","fresh"],dairy:1,soy:0},
+  {id:65,n:"Minestrone Soup with Bread",d:"Hearty vegetable soup with beans and bread",c:"italian",t:["lunch","dinner"],v:1,e:0,cal:300,p:10,cb:40,f:10,s:"1 large bowl + bread",ig:["cannellini beans","pasta","vegetables","tomato","herbs"],tg:["light","high-fiber"],dairy:0,soy:0},
+  {id:66,n:"Egg Frittata with Toast",d:"Italian omelette with vegetables and toast",c:"italian",t:["breakfast"],v:0,e:1,cal:380,p:20,cb:28,f:22,s:"1 wedge + 2 toast",ig:["eggs","bell peppers","zucchini","cheese","bread"],tg:["high-protein"],dairy:1,soy:0},
+  {id:67,n:"Chicken Parmesan with Pasta",d:"Breaded chicken with marinara over spaghetti",c:"italian",t:["dinner"],v:0,e:1,cal:580,p:34,cb:48,f:26,s:"1 cutlet + 1 cup pasta",ig:["chicken breast","breadcrumbs","mozzarella","marinara","spaghetti"],tg:["high-protein","filling"],dairy:1,soy:0},
+  {id:68,n:"Bruschetta with Tomato Soup",d:"Garlic bread with fresh tomato soup",c:"italian",t:["lunch"],v:1,e:0,cal:320,p:8,cb:38,f:14,s:"3 bruschetta + 1 bowl soup",ig:["ciabatta","tomato","garlic","basil","olive oil"],tg:["light","warm"],dairy:0,soy:0},
+  {id:69,n:"Vegetable Lasagna",d:"Layered pasta with ricotta, spinach, marinara",c:"italian",t:["dinner"],v:1,e:1,cal:480,p:18,cb:42,f:26,s:"1 large square",ig:["lasagna sheets","ricotta","spinach","mushrooms","mozzarella"],tg:["comfort-food"],dairy:1,soy:0},
+  // MEDITERRANEAN (12)
+  {id:70,n:"Falafel Wrap",d:"Chickpea falafel in pita with hummus and tahini",c:"mediterranean",t:["lunch"],v:1,e:0,cal:420,p:14,cb:48,f:18,s:"1 large wrap",ig:["chickpeas","pita bread","hummus","tahini","lettuce"],tg:["filling"],dairy:0,soy:0},
+  {id:71,n:"Hummus Pita Platter",d:"Hummus with pita, olives, and veggies",c:"mediterranean",t:["lunch","snack"],v:1,e:0,cal:350,p:12,cb:40,f:16,s:"½ cup hummus + 2 pita",ig:["chickpeas","tahini","pita bread","cucumber","olives"],tg:["light"],dairy:0,soy:0},
+  {id:72,n:"Greek Chicken Salad",d:"Grilled chicken with feta, olives, cucumber",c:"mediterranean",t:["lunch","dinner"],v:0,e:0,cal:400,p:30,cb:16,f:24,s:"1 large bowl",ig:["chicken breast","feta","olives","cucumber","tomato","lemon"],tg:["high-protein","low-carb"],dairy:1,soy:0},
+  {id:73,n:"Shakshuka with Bread",d:"Eggs poached in spiced tomato sauce with bread",c:"mediterranean",t:["breakfast"],v:0,e:1,cal:380,p:16,cb:32,f:20,s:"2 eggs in sauce + 2 bread",ig:["eggs","tomato","bell peppers","onion","cumin","bread"],tg:["high-protein"],dairy:0,soy:0},
+  {id:74,n:"Grilled Halloumi Salad",d:"Pan-grilled halloumi with greens and pomegranate",c:"mediterranean",t:["lunch"],v:1,e:0,cal:380,p:18,cb:20,f:26,s:"1 plate",ig:["halloumi","mixed greens","pomegranate","walnuts","olive oil"],tg:["high-protein","low-carb"],dairy:1,soy:0},
+  {id:75,n:"Stuffed Grape Leaves with Tzatziki",d:"Rice-stuffed grape leaves with yogurt dip",c:"mediterranean",t:["lunch"],v:1,e:0,cal:320,p:8,cb:36,f:16,s:"6 dolmas + ½ cup tzatziki",ig:["grape leaves","rice","herbs","yogurt","cucumber"],tg:["light"],dairy:1,soy:0},
+  {id:76,n:"Mediterranean Quinoa Bowl",d:"Quinoa with roasted veggies, chickpeas, feta, tahini",c:"mediterranean",t:["lunch","dinner"],v:1,e:0,cal:420,p:14,cb:52,f:16,s:"1 large bowl",ig:["quinoa","chickpeas","roasted vegetables","feta","tahini"],tg:["high-fiber"],dairy:1,soy:0},
+  {id:77,n:"Baked Feta Pasta",d:"Baked feta with cherry tomatoes and pasta",c:"mediterranean",t:["dinner"],v:1,e:0,cal:460,p:16,cb:48,f:22,s:"1.5 cups",ig:["feta","cherry tomatoes","pasta","olive oil","garlic","basil"],tg:["comfort-food"],dairy:1,soy:0},
+  {id:78,n:"Chicken Shawarma Plate",d:"Spiced chicken with rice, hummus, garlic sauce",c:"mediterranean",t:["lunch","dinner"],v:0,e:0,cal:520,p:32,cb:42,f:22,s:"1 plate",ig:["chicken thigh","rice","hummus","garlic sauce","pickles"],tg:["high-protein"],dairy:0,soy:0},
+  {id:79,n:"Lentil Soup with Pita",d:"Red lentil soup with cumin and lemon",c:"mediterranean",t:["lunch","dinner"],v:1,e:0,cal:340,p:16,cb:44,f:8,s:"1 large bowl + 1 pita",ig:["red lentils","onion","cumin","lemon","pita bread"],tg:["high-protein","high-fiber"],dairy:0,soy:0},
+  {id:80,n:"Grilled Fish with Couscous",d:"Herb-grilled fish with couscous and veggies",c:"mediterranean",t:["dinner"],v:0,e:0,cal:440,p:30,cb:40,f:16,s:"1 fillet + 1 cup couscous",ig:["fish fillet","couscous","roasted vegetables","lemon","herbs"],tg:["high-protein","omega-rich"],dairy:0,soy:0},
+  {id:81,n:"Turkish Eggs (Cilbir)",d:"Poached eggs over garlicky yogurt with chili butter",c:"mediterranean",t:["breakfast"],v:0,e:1,cal:340,p:16,cb:24,f:20,s:"2 eggs + yogurt + 2 toast",ig:["eggs","yogurt","garlic","butter","chili flakes","bread"],tg:["high-protein"],dairy:1,soy:0},
+  // MEXICAN (12)
+  {id:82,n:"Bean & Cheese Burrito",d:"Flour tortilla with refried beans, cheese, rice, salsa",c:"mexican",t:["lunch","dinner"],v:1,e:0,cal:480,p:18,cb:54,f:20,s:"1 large burrito",ig:["flour tortilla","refried beans","cheese","rice","salsa"],tg:["filling"],dairy:1,soy:0},
+  {id:83,n:"Chicken Burrito Bowl",d:"Grilled chicken over rice with beans, corn, guac",c:"mexican",t:["lunch","dinner"],v:0,e:0,cal:520,p:32,cb:50,f:20,s:"1 large bowl",ig:["chicken breast","rice","black beans","corn","guacamole","salsa"],tg:["high-protein"],dairy:0,soy:0},
+  {id:84,n:"Veggie Quesadilla",d:"Crispy tortilla with cheese, peppers, onions",c:"mexican",t:["lunch"],v:1,e:0,cal:420,p:16,cb:38,f:22,s:"1 quesadilla + salsa",ig:["flour tortilla","cheese","bell peppers","onion","mushrooms"],tg:["quick","cheesy"],dairy:1,soy:0},
+  {id:85,n:"Chicken Tacos",d:"Three soft tortillas with chicken, lettuce, pico",c:"mexican",t:["lunch","dinner"],v:0,e:0,cal:460,p:28,cb:36,f:22,s:"3 tacos",ig:["corn tortillas","chicken","lettuce","pico de gallo","lime"],tg:["high-protein"],dairy:0,soy:0},
+  {id:86,n:"Black Bean Tacos",d:"Three tortillas with black beans, avocado, lime",c:"mexican",t:["lunch","dinner"],v:1,e:0,cal:400,p:16,cb:48,f:14,s:"3 tacos",ig:["corn tortillas","black beans","avocado","cabbage","lime"],tg:["high-fiber"],dairy:0,soy:0},
+  {id:87,n:"Huevos Rancheros",d:"Fried eggs on tortillas with ranchero sauce, beans",c:"mexican",t:["breakfast"],v:0,e:1,cal:420,p:18,cb:36,f:22,s:"2 eggs + 2 tortillas + beans",ig:["eggs","corn tortillas","ranchero sauce","black beans","avocado"],tg:["high-protein"],dairy:0,soy:0},
+  {id:88,n:"Guacamole with Chips",d:"Fresh guacamole with tortilla chips",c:"mexican",t:["snack"],v:1,e:0,cal:300,p:4,cb:28,f:20,s:"½ cup guac + chips",ig:["avocado","lime","onion","tomato","cilantro","tortilla chips"],tg:["fresh"],dairy:0,soy:0},
+  {id:89,n:"Chicken Enchiladas",d:"Tortillas with chicken, cheese, red sauce",c:"mexican",t:["dinner"],v:0,e:0,cal:520,p:28,cb:44,f:24,s:"2 enchiladas + rice",ig:["chicken","corn tortillas","enchilada sauce","cheese","rice"],tg:["comfort-food"],dairy:1,soy:0},
+  {id:90,n:"Mexican Rice Bowl with Beans",d:"Seasoned rice with pinto beans, corn, pico",c:"mexican",t:["lunch","dinner"],v:1,e:0,cal:440,p:14,cb:62,f:14,s:"1 large bowl",ig:["rice","pinto beans","corn","bell peppers","pico de gallo"],tg:["high-fiber"],dairy:0,soy:0},
+  {id:91,n:"Fish Tacos",d:"Three tortillas with crispy fish, slaw, chipotle mayo",c:"mexican",t:["lunch","dinner"],v:0,e:0,cal:420,p:24,cb:36,f:20,s:"3 tacos",ig:["white fish","corn tortillas","cabbage","chipotle mayo","lime"],tg:["omega-rich"],dairy:0,soy:0},
+  {id:92,n:"Chilaquiles",d:"Tortilla chips in salsa verde with eggs, cheese",c:"mexican",t:["breakfast"],v:0,e:1,cal:400,p:14,cb:38,f:22,s:"1 plate",ig:["tortilla chips","salsa verde","eggs","cheese","sour cream"],tg:["comfort-food"],dairy:1,soy:0},
+  {id:93,n:"Sweet Potato Black Bean Tacos",d:"Roasted sweet potato with black beans, avocado",c:"mexican",t:["lunch","dinner"],v:1,e:0,cal:380,p:12,cb:52,f:14,s:"3 tacos",ig:["sweet potato","black beans","corn tortillas","avocado","lime"],tg:["high-fiber"],dairy:0,soy:0},
+  // ASIAN (12)
+  {id:94,n:"Vegetable Stir-fry Noodles",d:"Wok-tossed noodles with bok choy and soy-ginger",c:"asian",t:["lunch","dinner"],v:1,e:0,cal:380,p:12,cb:50,f:14,s:"1.5 cups",ig:["egg noodles","bok choy","bell peppers","soy sauce","ginger"],tg:["quick"],dairy:0,soy:1},
+  {id:95,n:"Chicken Fried Rice",d:"Stir-fried rice with chicken, egg, soy sauce",c:"asian",t:["lunch","dinner"],v:0,e:1,cal:480,p:24,cb:52,f:18,s:"2 cups",ig:["rice","chicken","egg","peas","carrots","soy sauce"],tg:["high-protein","quick"],dairy:0,soy:1},
+  {id:96,n:"Tofu Pad Thai",d:"Rice noodles with tofu, peanuts, tamarind",c:"asian",t:["lunch","dinner"],v:1,e:0,cal:420,p:16,cb:52,f:16,s:"1.5 cups",ig:["rice noodles","tofu","peanuts","bean sprouts","tamarind"],tg:["classic"],dairy:0,soy:1},
+  {id:97,n:"Chicken Teriyaki Noodles",d:"Udon with teriyaki chicken and broccoli",c:"asian",t:["lunch","dinner"],v:0,e:0,cal:500,p:28,cb:52,f:18,s:"1.5 cups",ig:["udon noodles","chicken thigh","teriyaki sauce","broccoli"],tg:["high-protein"],dairy:0,soy:1},
+  {id:98,n:"Vegetable Ramen",d:"Miso broth with noodles, tofu, corn, nori",c:"asian",t:["lunch","dinner"],v:1,e:0,cal:380,p:14,cb:46,f:14,s:"1 large bowl",ig:["ramen noodles","miso paste","tofu","corn","mushrooms","nori"],tg:["warm","umami"],dairy:0,soy:1},
+  {id:99,n:"Egg Fried Rice",d:"Wok-fried rice with eggs, spring onions",c:"asian",t:["lunch","dinner"],v:0,e:1,cal:420,p:14,cb:52,f:16,s:"2 cups",ig:["rice","eggs","spring onions","peas","soy sauce"],tg:["quick"],dairy:0,soy:1},
+  {id:100,n:"Thai Green Curry with Rice",d:"Coconut green curry with vegetables over rice",c:"asian",t:["lunch","dinner"],v:1,e:0,cal:450,p:12,cb:54,f:20,s:"1 cup curry + 1 cup rice",ig:["coconut milk","green curry paste","vegetables","Thai basil","jasmine rice"],tg:["aromatic"],dairy:0,soy:0},
+  {id:101,n:"Chicken Satay with Rice",d:"Grilled chicken skewers with peanut sauce and rice",c:"asian",t:["dinner"],v:0,e:0,cal:500,p:30,cb:46,f:22,s:"4 skewers + 1 cup rice",ig:["chicken thigh","peanut butter","coconut milk","jasmine rice"],tg:["high-protein"],dairy:0,soy:0},
+  {id:102,n:"Miso Soup with Soba",d:"Miso broth with soba noodles, tofu, seaweed",c:"asian",t:["lunch"],v:1,e:0,cal:300,p:14,cb:42,f:8,s:"1 large bowl",ig:["soba noodles","miso paste","tofu","seaweed","scallions"],tg:["light","warm"],dairy:0,soy:1},
+  {id:103,n:"Spring Rolls with Sauce",d:"Fresh rice paper rolls with peanut sauce",c:"asian",t:["snack"],v:1,e:0,cal:240,p:6,cb:30,f:10,s:"3 rolls + sauce",ig:["rice paper","vermicelli","carrots","cucumber","herbs","peanut sauce"],tg:["fresh","light"],dairy:0,soy:0},
+  {id:104,n:"Bibimbap",d:"Korean rice bowl with veggies, gochujang, egg",c:"asian",t:["lunch","dinner"],v:0,e:1,cal:480,p:18,cb:56,f:18,s:"1 large bowl",ig:["rice","spinach","carrots","mushrooms","egg","gochujang"],tg:["balanced"],dairy:0,soy:1},
+  {id:105,n:"Japanese Curry with Rice",d:"Japanese curry with potato, carrots, tofu over rice",c:"asian",t:["dinner"],v:1,e:0,cal:460,p:14,cb:58,f:18,s:"1 cup curry + 1 cup rice",ig:["potato","carrots","tofu","curry roux","onion","rice"],tg:["comfort-food"],dairy:0,soy:1},
+  // CONTINENTAL (15)
+  {id:106,n:"Avocado Toast with Eggs",d:"Sourdough with avocado, poached eggs, chili flakes",c:"continental",t:["breakfast"],v:0,e:1,cal:380,p:16,cb:30,f:22,s:"2 slices + 2 eggs",ig:["sourdough","avocado","eggs","chili flakes","microgreens"],tg:["high-protein"],dairy:0,soy:0},
+  {id:107,n:"Scrambled Eggs on Toast",d:"Creamy scrambled eggs with mushrooms on toast",c:"continental",t:["breakfast"],v:0,e:1,cal:350,p:18,cb:26,f:20,s:"2 eggs + 2 toast + mushrooms",ig:["eggs","butter","whole wheat bread","mushrooms"],tg:["quick","high-protein"],dairy:1,soy:0},
+  {id:108,n:"Pancakes with Maple Syrup",d:"Buttermilk pancakes (3) with syrup and berries",c:"continental",t:["breakfast"],v:0,e:1,cal:420,p:10,cb:58,f:16,s:"3 pancakes + syrup",ig:["flour","buttermilk","egg","maple syrup","butter","berries"],tg:["sweet"],dairy:1,soy:0},
+  {id:109,n:"Grilled Chicken Sandwich",d:"Grilled chicken with lettuce, honey mustard on ciabatta",c:"continental",t:["lunch"],v:0,e:0,cal:450,p:30,cb:36,f:18,s:"1 sandwich",ig:["chicken breast","ciabatta","lettuce","tomato","honey mustard"],tg:["high-protein"],dairy:0,soy:0},
+  {id:110,n:"Classic Caesar Salad",d:"Romaine with Caesar dressing, croutons, parmesan",c:"continental",t:["lunch"],v:0,e:1,cal:350,p:12,cb:20,f:26,s:"1 large salad",ig:["romaine","parmesan","croutons","caesar dressing"],tg:["classic","light"],dairy:1,soy:0},
+  {id:111,n:"Mushroom Soup with Bread",d:"Cream of mushroom soup with sourdough",c:"continental",t:["lunch"],v:1,e:0,cal:300,p:8,cb:34,f:14,s:"1 large bowl + 2 bread",ig:["mushrooms","cream","onion","garlic","sourdough"],tg:["warm","comfort-food"],dairy:1,soy:0},
+  {id:112,n:"Grilled Chicken with Mash",d:"Herb chicken with mashed potatoes and broccoli",c:"continental",t:["dinner"],v:0,e:0,cal:520,p:34,cb:40,f:22,s:"1 breast + 1 cup mash + broccoli",ig:["chicken breast","potato","butter","cream","broccoli"],tg:["high-protein","balanced"],dairy:1,soy:0},
+  {id:113,n:"Baked Salmon with Vegetables",d:"Salmon with lemon, asparagus, sweet potato",c:"continental",t:["dinner"],v:0,e:0,cal:480,p:36,cb:20,f:28,s:"1 fillet + vegetables",ig:["salmon","asparagus","sweet potato","lemon","olive oil"],tg:["high-protein","omega-rich"],dairy:0,soy:0},
+  {id:114,n:"Veggie Burger with Fries",d:"Plant patty on brioche with sweet potato fries",c:"continental",t:["lunch","dinner"],v:1,e:0,cal:520,p:16,cb:56,f:26,s:"1 burger + fries",ig:["plant-based patty","brioche bun","lettuce","sweet potato"],tg:["filling"],dairy:0,soy:1},
+  {id:115,n:"Omelette with Toast",d:"Three-egg omelette with cheese, spinach, tomato",c:"continental",t:["breakfast"],v:0,e:1,cal:380,p:22,cb:24,f:24,s:"1 omelette + 2 toast",ig:["eggs","cheese","spinach","tomato","bread","butter"],tg:["high-protein"],dairy:1,soy:0},
+  {id:116,n:"Mac and Cheese",d:"Baked macaroni with cheddar and gruyere",c:"continental",t:["lunch","dinner"],v:1,e:0,cal:480,p:16,cb:48,f:24,s:"1.5 cups",ig:["macaroni","cheddar","gruyere","milk","butter"],tg:["comfort-food","cheesy"],dairy:1,soy:0},
+  {id:117,n:"Steak with Roasted Vegetables",d:"Pan-seared steak with root veggies and herb butter",c:"continental",t:["dinner"],v:0,e:0,cal:550,p:40,cb:20,f:34,s:"150g steak + vegetables",ig:["beef steak","root vegetables","butter","herbs","garlic"],tg:["high-protein"],dairy:1,soy:0},
+  {id:118,n:"French Toast with Berries",d:"Cinnamon French toast with berries and honey",c:"continental",t:["breakfast"],v:0,e:1,cal:400,p:12,cb:48,f:18,s:"2 slices + berries + honey",ig:["bread","eggs","milk","cinnamon","berries","honey"],tg:["sweet"],dairy:1,soy:0},
+  {id:119,n:"Turkey Club Sandwich",d:"Triple-decker turkey with bacon, lettuce, tomato",c:"continental",t:["lunch"],v:0,e:0,cal:460,p:26,cb:38,f:22,s:"1 sandwich",ig:["turkey","bacon","bread","lettuce","tomato","mayo"],tg:["classic","filling"],dairy:0,soy:0},
+  {id:120,n:"Vegetable Quiche",d:"Pastry filled with eggs, cheese, spinach, mushrooms",c:"continental",t:["lunch","breakfast"],v:0,e:1,cal:380,p:14,cb:28,f:24,s:"1 large slice",ig:["pastry","eggs","cream","cheese","spinach","mushrooms"],tg:["elegant"],dairy:1,soy:0},
+  // SALAD/BOWL (12)
+  {id:121,n:"Chicken Poke Bowl",d:"Chicken over sushi rice with edamame, avocado",c:"salad-bowl",t:["lunch","dinner"],v:0,e:0,cal:450,p:30,cb:46,f:16,s:"1 large bowl",ig:["chicken","sushi rice","edamame","avocado","sesame"],tg:["high-protein","balanced"],dairy:0,soy:1},
+  {id:122,n:"Vegan Buddha Bowl",d:"Sweet potato, quinoa, chickpeas, avocado, tahini",c:"salad-bowl",t:["lunch","dinner"],v:1,e:0,cal:400,p:14,cb:50,f:16,s:"1 large bowl",ig:["sweet potato","quinoa","chickpeas","avocado","kale","tahini"],tg:["high-fiber"],dairy:0,soy:0},
+  {id:123,n:"Greek Protein Bowl",d:"Quinoa with halloumi, hummus, olives, tzatziki",c:"salad-bowl",t:["lunch"],v:1,e:0,cal:420,p:20,cb:38,f:22,s:"1 large bowl",ig:["quinoa","halloumi","hummus","olives","cucumber","tzatziki"],tg:["high-protein"],dairy:1,soy:0},
+  {id:124,n:"Tuna Poke Bowl",d:"Tuna over sushi rice with mango, cucumber",c:"salad-bowl",t:["lunch","dinner"],v:0,e:0,cal:430,p:28,cb:44,f:14,s:"1 large bowl",ig:["tuna","sushi rice","mango","cucumber","avocado","nori"],tg:["high-protein","omega-rich"],dairy:0,soy:1},
+  {id:125,n:"Quinoa Veggie Bowl",d:"Quinoa with broccoli, sweet potato, chickpeas, tahini",c:"salad-bowl",t:["lunch","dinner"],v:1,e:0,cal:380,p:14,cb:48,f:14,s:"1 large bowl",ig:["quinoa","broccoli","sweet potato","chickpeas","tahini"],tg:["high-fiber"],dairy:0,soy:0},
+  {id:126,n:"Teriyaki Chicken Bowl",d:"Teriyaki chicken over brown rice with edamame",c:"salad-bowl",t:["lunch","dinner"],v:0,e:0,cal:480,p:30,cb:50,f:16,s:"1 large bowl",ig:["chicken","brown rice","teriyaki sauce","edamame","avocado"],tg:["high-protein"],dairy:0,soy:1},
+  {id:127,n:"Falafel Buddha Bowl",d:"Falafel with tabbouleh, hummus, tahini",c:"salad-bowl",t:["lunch"],v:1,e:0,cal:440,p:16,cb:50,f:18,s:"1 large bowl",ig:["chickpeas","bulgur","parsley","hummus","pickled onion","tahini"],tg:["high-fiber"],dairy:0,soy:0},
+  {id:128,n:"Southwest Chicken Salad",d:"Grilled chicken with black beans, corn, avocado",c:"salad-bowl",t:["lunch"],v:0,e:0,cal:420,p:28,cb:30,f:22,s:"1 large bowl",ig:["chicken","mixed greens","black beans","corn","avocado"],tg:["high-protein"],dairy:0,soy:0},
+  {id:129,n:"Acai Bowl",d:"Acai smoothie with granola, banana, berries",c:"salad-bowl",t:["breakfast"],v:1,e:0,cal:380,p:8,cb:60,f:14,s:"1 bowl",ig:["acai","banana","granola","berries","coconut","honey"],tg:["sweet"],dairy:0,soy:0},
+  {id:130,n:"Smoothie Bowl",d:"Mango-banana with chia, nuts, granola",c:"salad-bowl",t:["breakfast"],v:1,e:0,cal:350,p:10,cb:52,f:12,s:"1 bowl",ig:["mango","banana","chia seeds","granola","nuts","berries"],tg:["quick","sweet"],dairy:0,soy:0},
+  {id:131,n:"Mediterranean Grain Bowl",d:"Farro with eggplant, tomatoes, feta, olives",c:"salad-bowl",t:["lunch"],v:1,e:0,cal:400,p:12,cb:52,f:14,s:"1 large bowl",ig:["farro","eggplant","cherry tomatoes","feta","olives"],tg:["high-fiber"],dairy:1,soy:0},
+  {id:132,n:"Egg & Avocado Grain Bowl",d:"Brown rice with eggs, avocado, greens, miso",c:"salad-bowl",t:["lunch"],v:0,e:1,cal:440,p:18,cb:42,f:22,s:"1 large bowl",ig:["brown rice","eggs","avocado","mixed greens","pumpkin seeds","miso"],tg:["balanced"],dairy:0,soy:1},
+  // SNACKS (23) — existing
+  {id:133,n:"Sprouts Chaat",d:"Sprouted lentils with onion, tomato, lemon, chaat masala",c:"indian-roti",t:["snack"],v:1,e:0,cal:180,p:10,cb:24,f:4,s:"1 cup",ig:["mixed sprouts","onion","tomato","lemon","chaat masala"],tg:["high-protein","low-fat"],dairy:0,soy:0},
+  {id:134,n:"Roasted Makhana",d:"Fox nuts roasted in ghee with turmeric",c:"indian-roti",t:["snack"],v:1,e:0,cal:160,p:5,cb:20,f:6,s:"1 cup",ig:["fox nuts","ghee","turmeric","salt","black pepper"],tg:["low-calorie","crunchy"],dairy:1,soy:0},
+  {id:135,n:"Protein Ladoo",d:"No-bake balls with nuts, dates, protein powder, coconut",c:"indian-roti",t:["snack"],v:1,e:0,cal:200,p:8,cb:22,f:10,s:"2 ladoos",ig:["dates","almonds","protein powder","coconut","ghee"],tg:["energy-boost"],dairy:1,soy:0},
+  {id:136,n:"Greek Yogurt with Honey & Nuts",d:"Thick yogurt with honey and mixed nuts",c:"continental",t:["snack","breakfast"],v:1,e:0,cal:220,p:14,cb:20,f:10,s:"1 cup + toppings",ig:["Greek yogurt","honey","almonds","walnuts","pumpkin seeds"],tg:["high-protein","quick"],dairy:1,soy:0},
+  {id:137,n:"Banana Peanut Butter Smoothie",d:"Banana smoothie with peanut butter, milk, honey",c:"continental",t:["snack","breakfast"],v:1,e:0,cal:280,p:12,cb:34,f:12,s:"1 tall glass",ig:["banana","peanut butter","milk","honey"],tg:["energy-boost"],dairy:1,soy:0},
+  {id:138,n:"Trail Mix",d:"Almonds, cashews, raisins, cranberries, dark chocolate",c:"continental",t:["snack"],v:1,e:0,cal:200,p:6,cb:18,f:12,s:"¼ cup (30g)",ig:["almonds","cashews","raisins","cranberries","dark chocolate"],tg:["portable"],dairy:0,soy:0},
+  {id:139,n:"Masala Chana",d:"Spiced boiled chickpeas with onion, lemon",c:"indian-roti",t:["snack"],v:1,e:0,cal:180,p:10,cb:26,f:4,s:"1 cup",ig:["chickpeas","onion","green chili","lemon","chaat masala"],tg:["high-protein","high-fiber"],dairy:0,soy:0},
+  {id:140,n:"Protein Bar",d:"Whey protein bar with chocolate, nuts, oats",c:"continental",t:["snack"],v:1,e:0,cal:220,p:20,cb:22,f:6,s:"1 bar (60g)",ig:["whey protein","oats","dark chocolate","almonds","honey"],tg:["high-protein","portable"],dairy:1,soy:0},
+  {id:141,n:"Paneer Tikka Bites",d:"Grilled paneer cubes with mint chutney",c:"indian-roti",t:["snack"],v:1,e:0,cal:200,p:14,cb:6,f:14,s:"6 pieces + chutney",ig:["paneer","yogurt","bell peppers","spices","mint chutney"],tg:["high-protein","low-carb"],dairy:1,soy:0},
+  {id:142,n:"Hummus with Veggie Sticks",d:"Hummus with carrot, cucumber, celery sticks",c:"mediterranean",t:["snack"],v:1,e:0,cal:180,p:6,cb:18,f:10,s:"¼ cup hummus + veggies",ig:["chickpeas","tahini","carrots","cucumber","celery"],tg:["low-calorie","fresh"],dairy:0,soy:0},
+  {id:143,n:"Egg White Omelette",d:"Egg whites with spinach, mushrooms, feta",c:"continental",t:["snack","breakfast"],v:0,e:1,cal:140,p:16,cb:4,f:6,s:"1 omelette (3 whites)",ig:["egg whites","spinach","mushrooms","feta cheese"],tg:["high-protein","low-calorie"],dairy:1,soy:0},
+  {id:144,n:"Fruit & Nut Bowl",d:"Fresh fruit with mixed nuts and honey",c:"continental",t:["snack"],v:1,e:0,cal:220,p:4,cb:32,f:10,s:"1 bowl",ig:["apple","banana","pomegranate","almonds","walnuts","honey"],tg:["fresh","quick"],dairy:0,soy:0},
+  {id:145,n:"Roasted Chickpeas",d:"Oven-roasted chickpeas with cumin and paprika",c:"mediterranean",t:["snack"],v:1,e:0,cal:160,p:8,cb:20,f:4,s:"⅓ cup",ig:["chickpeas","olive oil","cumin","paprika","garlic powder"],tg:["high-fiber","crunchy"],dairy:0,soy:0},
+  {id:146,n:"Whey Protein Shake",d:"Protein shake with milk, banana, whey",c:"continental",t:["snack"],v:1,e:0,cal:200,p:28,cb:16,f:4,s:"1 glass (350ml)",ig:["whey protein","milk","banana"],tg:["high-protein","post-workout"],dairy:1,soy:0},
+  {id:147,n:"Boiled Eggs",d:"2 boiled eggs with salt and pepper",c:"continental",t:["snack"],v:0,e:1,cal:140,p:12,cb:2,f:10,s:"2 eggs",ig:["eggs","salt","pepper"],tg:["high-protein","portable","low-carb"],dairy:0,soy:0},
+  {id:148,n:"Oats Energy Balls",d:"No-bake oat, peanut butter, honey balls",c:"continental",t:["snack"],v:1,e:0,cal:180,p:6,cb:24,f:8,s:"2 balls",ig:["rolled oats","peanut butter","honey","chocolate chips","flaxseed"],tg:["energy-boost"],dairy:0,soy:0},
+  {id:149,n:"Paneer Salad",d:"Paneer with cucumber, tomato, bell pepper, lemon",c:"indian-roti",t:["snack"],v:1,e:0,cal:200,p:14,cb:8,f:14,s:"1 cup",ig:["paneer","cucumber","tomato","bell pepper","lemon"],tg:["high-protein","low-carb"],dairy:1,soy:0},
+  {id:150,n:"Mixed Nuts",d:"Almonds, cashews, walnuts, pistachios",c:"continental",t:["snack"],v:1,e:0,cal:180,p:5,cb:8,f:16,s:"30g",ig:["almonds","cashews","walnuts","pistachios"],tg:["portable","healthy-fats"],dairy:0,soy:0},
+  {id:151,n:"Chicken Tikka",d:"Grilled yogurt-marinated chicken with mint chutney",c:"indian-roti",t:["snack"],v:0,e:0,cal:200,p:26,cb:4,f:10,s:"4 pieces + chutney",ig:["chicken breast","yogurt","spices","mint chutney"],tg:["high-protein","low-carb"],dairy:1,soy:0},
+  {id:152,n:"Masala Oats",d:"Savory oats with vegetables and Indian spices",c:"indian-roti",t:["snack","breakfast"],v:1,e:0,cal:200,p:8,cb:30,f:6,s:"1 cup",ig:["rolled oats","onion","peas","peanuts","turmeric","cumin"],tg:["quick","high-fiber"],dairy:0,soy:0},
+  {id:153,n:"Poha",d:"Flattened rice with peanuts, curry leaves, turmeric",c:"indian-roti",t:["breakfast","snack"],v:1,e:0,cal:250,p:6,cb:38,f:8,s:"1.5 cups",ig:["flattened rice","peanuts","onion","curry leaves","turmeric"],tg:["light","quick"],dairy:0,soy:0},
+  {id:154,n:"Oats Chilla",d:"Savory oat pancake with vegetables",c:"indian-roti",t:["breakfast","snack"],v:1,e:0,cal:220,p:10,cb:28,f:8,s:"2 chillas + chutney",ig:["oats","besan","onion","tomato","green chili"],tg:["high-protein","quick"],dairy:0,soy:0},
+  {id:155,n:"Moong Dal Chilla",d:"Green gram pancakes with chutney",c:"indian-roti",t:["breakfast","snack"],v:1,e:0,cal:240,p:14,cb:26,f:8,s:"2 chillas + chutney",ig:["moong dal","ginger","green chili","onion","coriander"],tg:["high-protein","crispy"],dairy:0,soy:0},
+  // COMMONLY EATEN IN INDIA — Street Food, Indo-Chinese, Popular (65)
+  {id:156,n:"Pav Bhaji",d:"Buttery mashed vegetable curry with toasted pav buns",c:"indian-roti",t:["lunch","dinner"],v:1,e:0,cal:450,p:12,cb:52,f:22,s:"2 pav + 1.5 cups bhaji",ig:["potato","peas","tomato","butter","pav buns"],tg:["street-food","comfort-food"],dairy:1,soy:0},
+  {id:157,n:"Vada Pav",d:"Spiced potato fritter in pav bun with chutneys",c:"indian-roti",t:["snack","lunch"],v:1,e:0,cal:310,p:7,cb:38,f:15,s:"1 vada pav",ig:["potato","besan","pav bun","garlic chutney","tamarind chutney"],tg:["street-food","quick"],dairy:0,soy:0},
+  {id:158,n:"Chole Bhature",d:"Chickpea curry with deep-fried puffed bread",c:"indian-roti",t:["lunch","breakfast"],v:1,e:0,cal:550,p:16,cb:58,f:28,s:"2 bhature + 1 cup chole",ig:["chickpeas","maida","onion","tomato","spices","oil"],tg:["street-food","indulgent"],dairy:0,soy:0},
+  {id:159,n:"Samosa (2 pcs)",d:"Crispy pastry stuffed with spiced potato and peas",c:"indian-roti",t:["snack"],v:1,e:0,cal:280,p:6,cb:30,f:16,s:"2 samosas + chutney",ig:["potato","peas","maida","cumin","oil"],tg:["street-food","crispy"],dairy:0,soy:0},
+  {id:160,n:"Bhel Puri",d:"Puffed rice with chutneys, sev, onion, tomato",c:"indian-roti",t:["snack"],v:1,e:0,cal:200,p:5,cb:32,f:6,s:"1 plate",ig:["puffed rice","sev","onion","tomato","tamarind chutney"],tg:["street-food","tangy"],dairy:0,soy:0},
+  {id:161,n:"Pani Puri (6 pcs)",d:"Hollow puris with potato, chickpeas, tangy mint water",c:"indian-roti",t:["snack"],v:1,e:0,cal:180,p:5,cb:28,f:5,s:"6 puris",ig:["semolina puris","potato","chickpeas","mint water","tamarind"],tg:["street-food","tangy"],dairy:0,soy:0},
+  {id:162,n:"Aloo Tikki with Chole",d:"Potato patties topped with chole, chutneys, yogurt",c:"indian-roti",t:["snack","lunch"],v:1,e:0,cal:380,p:12,cb:44,f:18,s:"2 tikkis + chole",ig:["potato","chickpeas","yogurt","tamarind chutney"],tg:["street-food","filling"],dairy:1,soy:0},
+  {id:163,n:"Dabeli",d:"Sweet-spicy potato in pav with pomegranate, peanuts",c:"indian-roti",t:["snack"],v:1,e:0,cal:260,p:6,cb:34,f:12,s:"1 dabeli",ig:["potato","pav bun","pomegranate","peanuts","sev"],tg:["street-food"],dairy:0,soy:0},
+  {id:164,n:"Dahi Vada (2 pcs)",d:"Lentil fritters in yogurt with chutneys",c:"indian-roti",t:["snack"],v:1,e:0,cal:220,p:8,cb:28,f:8,s:"2 vadas + yogurt",ig:["urad dal","yogurt","cumin","tamarind chutney"],tg:["cooling","tangy"],dairy:1,soy:0},
+  {id:165,n:"Kachori with Aloo Sabzi",d:"Deep-fried lentil-stuffed pastry with potato curry",c:"indian-roti",t:["breakfast","snack"],v:1,e:0,cal:420,p:10,cb:42,f:24,s:"2 kachoris + 1 cup sabzi",ig:["maida","moong dal","potato","spices","oil"],tg:["street-food","indulgent"],dairy:0,soy:0},
+  {id:166,n:"Dhokla with Chutney",d:"Steamed chickpea flour cake with mustard tempering",c:"indian-roti",t:["breakfast","snack"],v:1,e:0,cal:180,p:8,cb:26,f:4,s:"4 pieces + chutney",ig:["besan","semolina","yogurt","mustard seeds","curry leaves"],tg:["steamed","low-fat"],dairy:1,soy:0},
+  {id:167,n:"Bread Pakora (2 pcs)",d:"Bread stuffed with potato, battered and deep-fried",c:"indian-roti",t:["snack"],v:1,e:0,cal:320,p:8,cb:32,f:18,s:"2 bread pakoras",ig:["bread","potato","besan","green chili","oil"],tg:["street-food","crispy"],dairy:0,soy:0},
+  {id:168,n:"Misal Pav",d:"Spicy sprouted moth curry with farsan and pav",c:"indian-roti",t:["breakfast","lunch"],v:1,e:0,cal:420,p:14,cb:48,f:18,s:"1 bowl + 2 pav",ig:["moth beans","farsan","onion","pav buns","spices"],tg:["street-food","spicy"],dairy:0,soy:0},
+  {id:169,n:"Sabudana Khichdi",d:"Tapioca pearls with peanuts and potatoes",c:"indian-roti",t:["breakfast","snack"],v:1,e:0,cal:280,p:5,cb:42,f:10,s:"1 cup",ig:["sabudana","peanuts","potato","cumin","green chili"],tg:["fasting-food"],dairy:0,soy:0},
+  {id:170,n:"Dal Makhani with Rice",d:"Creamy black dal with butter and cream, over rice",c:"indian-rice",t:["lunch","dinner"],v:1,e:0,cal:520,p:16,cb:62,f:22,s:"1.5 cups rice + 1 cup dal",ig:["black urad dal","rajma","butter","cream","basmati rice"],tg:["rich","restaurant-style"],dairy:1,soy:0},
+  {id:171,n:"Dal Makhani with Roti",d:"Creamy black dal with butter and cream, 2 rotis",c:"indian-roti",t:["lunch","dinner"],v:1,e:0,cal:440,p:16,cb:46,f:20,s:"2 rotis + 1 cup dal",ig:["black urad dal","rajma","butter","cream","wheat flour"],tg:["rich","restaurant-style"],dairy:1,soy:0},
+  {id:172,n:"Malai Kofta with Roti",d:"Paneer-potato balls in cashew-cream gravy, 2 rotis",c:"indian-roti",t:["lunch","dinner"],v:1,e:0,cal:560,p:16,cb:44,f:34,s:"2 rotis + 4 kofta",ig:["paneer","potato","cashews","cream","wheat flour"],tg:["rich","indulgent"],dairy:1,soy:0},
+  {id:173,n:"Sarson ka Saag with Makki Roti",d:"Mustard greens with cornmeal flatbread and butter",c:"indian-roti",t:["lunch","dinner"],v:1,e:0,cal:380,p:12,cb:40,f:18,s:"2 makki rotis + 1 cup saag",ig:["mustard greens","cornmeal","butter","garlic","ginger"],tg:["traditional","punjabi"],dairy:1,soy:0},
+  {id:174,n:"Paneer Bhurji with Roti",d:"Scrambled paneer with onion, tomato, chilies, 2 rotis",c:"indian-roti",t:["breakfast","lunch"],v:1,e:0,cal:460,p:22,cb:36,f:26,s:"2 rotis + 1 cup bhurji",ig:["paneer","onion","tomato","green chili","wheat flour"],tg:["high-protein","quick"],dairy:1,soy:0},
+  {id:175,n:"Butter Naan with Dal Fry",d:"Soft buttered naan with yellow dal fry",c:"indian-roti",t:["lunch","dinner"],v:1,e:0,cal:460,p:14,cb:52,f:20,s:"2 naans + 1 cup dal fry",ig:["maida","butter","toor dal","garlic","cumin","ghee"],tg:["restaurant-style"],dairy:1,soy:0},
+  {id:176,n:"Tandoori Chicken with Roti",d:"Chargrilled chicken with 2 rotis and mint chutney",c:"indian-roti",t:["dinner","lunch"],v:0,e:0,cal:440,p:36,cb:32,f:18,s:"2 pcs chicken + 2 rotis",ig:["chicken","yogurt","wheat flour","spices","mint chutney"],tg:["high-protein","grilled"],dairy:1,soy:0},
+  {id:177,n:"Chicken Tikka Masala with Rice",d:"Chicken tikka in creamy spiced gravy with rice",c:"indian-rice",t:["lunch","dinner"],v:0,e:0,cal:560,p:28,cb:52,f:24,s:"1.5 cups rice + 1 cup curry",ig:["chicken","tomato","cream","yogurt","basmati rice"],tg:["high-protein","rich"],dairy:1,soy:0},
+  {id:178,n:"Puri Sabzi",d:"Deep-fried puffed bread with potato curry",c:"indian-roti",t:["breakfast","lunch"],v:1,e:0,cal:450,p:10,cb:48,f:24,s:"4 puris + 1 cup aloo sabzi",ig:["wheat flour","potato","oil","cumin","turmeric"],tg:["comfort-food","indulgent"],dairy:0,soy:0},
+  {id:179,n:"Kadai Paneer with Roti",d:"Paneer with bell peppers in kadai masala, 2 rotis",c:"indian-roti",t:["lunch","dinner"],v:1,e:0,cal:500,p:20,cb:40,f:28,s:"2 rotis + 1 cup kadai paneer",ig:["paneer","bell peppers","onion","wheat flour","kadai masala"],tg:["high-protein","spicy"],dairy:1,soy:0},
+  {id:180,n:"Shahi Paneer with Naan",d:"Paneer in cashew-cream gravy with naan",c:"indian-roti",t:["lunch","dinner"],v:1,e:0,cal:540,p:18,cb:44,f:32,s:"2 naans + 1 cup shahi paneer",ig:["paneer","cashews","cream","maida","butter"],tg:["rich","indulgent"],dairy:1,soy:0},
+  {id:181,n:"Prawn Curry with Rice",d:"Coconut prawn curry with steamed rice",c:"indian-rice",t:["lunch","dinner"],v:0,e:0,cal:480,p:26,cb:50,f:18,s:"1.5 cups rice + 1 cup curry",ig:["prawns","coconut milk","basmati rice","curry leaves"],tg:["high-protein","coastal"],dairy:0,soy:0},
+  {id:182,n:"Chicken 65",d:"Spicy deep-fried chicken bites with yogurt and chili",c:"indian-rice",t:["snack","dinner"],v:0,e:0,cal:320,p:24,cb:14,f:20,s:"8-10 pieces",ig:["chicken","yogurt","red chili","curry leaves","ginger"],tg:["high-protein","spicy","crispy"],dairy:1,soy:0},
+  {id:183,n:"Pulao with Raita",d:"Lightly spiced vegetable pulao with raita",c:"indian-rice",t:["lunch","dinner"],v:1,e:0,cal:400,p:10,cb:58,f:12,s:"2 cups pulao + ½ cup raita",ig:["basmati rice","mixed vegetables","whole spices","yogurt","cucumber"],tg:["one-pot","light"],dairy:1,soy:0},
+  {id:184,n:"Khichdi with Papad & Pickle",d:"Rice-lentil porridge with ghee, papad, pickle",c:"indian-rice",t:["lunch","dinner"],v:1,e:0,cal:360,p:12,cb:52,f:10,s:"1.5 cups + papad + pickle",ig:["rice","moong dal","ghee","cumin","turmeric","papad"],tg:["comfort-food","light"],dairy:1,soy:0},
+  {id:185,n:"Egg Paratha",d:"Egg-coated paratha with pickle and curd",c:"indian-roti",t:["breakfast"],v:0,e:1,cal:340,p:14,cb:32,f:18,s:"1 egg paratha + curd + pickle",ig:["wheat flour","egg","oil","pickle","curd"],tg:["high-protein","quick"],dairy:1,soy:0},
+  {id:186,n:"Bread Omelette",d:"Masala omelette sandwiched in buttered toast",c:"indian-roti",t:["breakfast"],v:0,e:1,cal:320,p:16,cb:26,f:16,s:"1 bread omelette (2 eggs + 2 bread)",ig:["eggs","bread","onion","green chili","butter"],tg:["high-protein","quick","street-food"],dairy:1,soy:0},
+  {id:187,n:"Veg Hakka Noodles",d:"Stir-fried noodles with cabbage, carrots, soy-chili",c:"asian",t:["lunch","dinner"],v:1,e:0,cal:380,p:10,cb:50,f:16,s:"1.5 cups",ig:["noodles","cabbage","carrots","bell peppers","soy sauce"],tg:["indo-chinese","quick"],dairy:0,soy:1},
+  {id:188,n:"Chicken Hakka Noodles",d:"Stir-fried noodles with chicken and Indo-Chinese sauces",c:"asian",t:["lunch","dinner"],v:0,e:0,cal:460,p:22,cb:48,f:20,s:"1.5 cups",ig:["noodles","chicken","cabbage","bell peppers","soy sauce"],tg:["indo-chinese","high-protein"],dairy:0,soy:1},
+  {id:189,n:"Chilli Paneer (Dry)",d:"Crispy paneer with peppers in spicy Indo-Chinese sauce",c:"asian",t:["snack","dinner"],v:1,e:0,cal:340,p:16,cb:18,f:24,s:"1 cup / 8 pieces",ig:["paneer","bell peppers","onion","soy sauce","chili sauce"],tg:["indo-chinese","high-protein"],dairy:1,soy:1},
+  {id:190,n:"Veg Manchurian with Fried Rice",d:"Veggie balls in Manchurian sauce with fried rice",c:"asian",t:["lunch","dinner"],v:1,e:0,cal:520,p:10,cb:60,f:26,s:"1 cup rice + 6 balls",ig:["cabbage","carrots","cornflour","rice","soy sauce"],tg:["indo-chinese","indulgent"],dairy:0,soy:1},
+  {id:191,n:"Chicken Manchurian with Fried Rice",d:"Chicken balls in spicy sauce with egg fried rice",c:"asian",t:["lunch","dinner"],v:0,e:1,cal:580,p:24,cb:56,f:28,s:"1 cup rice + 6 balls",ig:["chicken","rice","egg","cornflour","soy sauce"],tg:["indo-chinese","high-protein"],dairy:0,soy:1},
+  {id:192,n:"Veg Momos (Steamed, 6 pcs)",d:"Steamed dumplings with cabbage and spicy chutney",c:"asian",t:["snack"],v:1,e:0,cal:200,p:6,cb:30,f:6,s:"6 momos + chutney",ig:["maida","cabbage","carrots","onion","soy sauce"],tg:["steamed","street-food"],dairy:0,soy:1},
+  {id:193,n:"Chicken Momos (Steamed, 6 pcs)",d:"Steamed chicken dumplings with red chutney",c:"asian",t:["snack"],v:0,e:0,cal:260,p:16,cb:26,f:10,s:"6 momos + chutney",ig:["maida","chicken mince","onion","ginger","soy sauce"],tg:["steamed","high-protein"],dairy:0,soy:1},
+  {id:194,n:"Chilli Chicken (Dry)",d:"Crispy chicken with peppers in soy-chili sauce",c:"asian",t:["snack","dinner"],v:0,e:0,cal:360,p:24,cb:16,f:22,s:"1 cup / 8 pieces",ig:["chicken","bell peppers","onion","soy sauce","chili sauce"],tg:["indo-chinese","high-protein"],dairy:0,soy:1},
+  {id:195,n:"Maggi Noodles (1 pack)",d:"Instant masala noodles with vegetables",c:"asian",t:["snack","breakfast"],v:1,e:0,cal:290,p:7,cb:42,f:11,s:"1 pack (70g) cooked",ig:["instant noodles","masala seasoning","peas","onion"],tg:["quick","instant"],dairy:0,soy:0},
+  {id:196,n:"Cornflakes with Milk",d:"Crunchy cornflakes with milk and banana",c:"continental",t:["breakfast"],v:1,e:0,cal:280,p:8,cb:50,f:4,s:"1 cup + 200ml milk + banana",ig:["cornflakes","milk","banana"],tg:["quick","simple"],dairy:1,soy:0},
+  {id:197,n:"Bread Butter Jam with Chai",d:"Toast with butter and jam, served with masala chai",c:"continental",t:["breakfast"],v:1,e:0,cal:280,p:6,cb:42,f:10,s:"2 slices toast + chai",ig:["bread","butter","jam","tea","milk","sugar"],tg:["quick","simple"],dairy:1,soy:0},
+  {id:198,n:"Chai with Parle-G Biscuits",d:"Hot masala chai with 4 Parle-G biscuits",c:"indian-roti",t:["snack"],v:1,e:0,cal:200,p:4,cb:32,f:6,s:"1 cup chai + 4 biscuits",ig:["tea","milk","sugar","ginger","biscuits"],tg:["quick","classic"],dairy:1,soy:0},
+  {id:199,n:"Mango Lassi",d:"Thick yogurt drink with mango pulp and cardamom",c:"indian-rice",t:["snack"],v:1,e:0,cal:220,p:6,cb:36,f:6,s:"1 tall glass (250ml)",ig:["yogurt","mango","sugar","cardamom"],tg:["cooling","sweet"],dairy:1,soy:0},
+  {id:200,n:"Sweet Lassi",d:"Chilled yogurt drink with sugar and rose water",c:"indian-rice",t:["snack"],v:1,e:0,cal:180,p:6,cb:28,f:4,s:"1 glass (250ml)",ig:["yogurt","sugar","rose water","cardamom"],tg:["cooling","sweet"],dairy:1,soy:0},
+  {id:201,n:"Banana Shake",d:"Banana milkshake with cardamom",c:"continental",t:["snack","breakfast"],v:1,e:0,cal:240,p:8,cb:38,f:6,s:"1 tall glass (300ml)",ig:["banana","milk","sugar","cardamom"],tg:["energy-boost","quick"],dairy:1,soy:0},
+  {id:202,n:"Chicken Kathi Roll",d:"Grilled chicken wrapped in paratha with onion, chutney",c:"indian-roti",t:["lunch","snack"],v:0,e:0,cal:400,p:22,cb:34,f:20,s:"1 roll",ig:["chicken","paratha","onion","green chutney","lemon"],tg:["street-food","high-protein"],dairy:0,soy:0},
+  {id:203,n:"Paneer Kathi Roll",d:"Paneer tikka wrapped in paratha with chutney",c:"indian-roti",t:["lunch","snack"],v:1,e:0,cal:380,p:16,cb:34,f:20,s:"1 roll",ig:["paneer","paratha","onion","green chutney","lemon"],tg:["street-food","high-protein"],dairy:1,soy:0},
+  {id:204,n:"Egg Roll",d:"Egg-coated paratha wrap with onion and chutney",c:"indian-roti",t:["snack","breakfast"],v:0,e:1,cal:320,p:14,cb:30,f:16,s:"1 roll",ig:["egg","paratha","onion","green chutney","ketchup"],tg:["street-food","quick"],dairy:0,soy:0},
+  {id:205,n:"Mysore Masala Dosa",d:"Crispy dosa with red chutney and potato, sambar",c:"south-indian",t:["breakfast","lunch"],v:1,e:0,cal:410,p:10,cb:48,f:20,s:"1 dosa + sambar + chutney",ig:["rice","urad dal","potato","red chutney","ghee"],tg:["crispy","spicy"],dairy:1,soy:0},
+  {id:206,n:"Rava Dosa",d:"Thin crispy semolina crepe with onions",c:"south-indian",t:["breakfast"],v:1,e:0,cal:280,p:6,cb:36,f:12,s:"2 rava dosas + chutney",ig:["rava","rice flour","onion","curry leaves","cumin"],tg:["crispy","quick"],dairy:0,soy:0},
+  {id:207,n:"Kerala Parotta with Chicken Curry",d:"Flaky flatbread with spicy Kerala chicken curry",c:"south-indian",t:["dinner","lunch"],v:0,e:0,cal:520,p:26,cb:42,f:26,s:"2 parottas + 1 cup curry",ig:["maida","chicken","coconut","curry leaves","fennel"],tg:["high-protein","kerala-style"],dairy:0,soy:0},
+  {id:208,n:"Hyderabadi Chicken Dum Biryani",d:"Slow-cooked layered biryani with chicken and saffron",c:"indian-rice",t:["lunch","dinner"],v:0,e:0,cal:600,p:28,cb:60,f:26,s:"2 cups biryani + raita",ig:["chicken","basmati rice","yogurt","saffron","fried onions"],tg:["high-protein","hyderabadi"],dairy:1,soy:0},
+  {id:209,n:"Hyderabadi Veg Dum Biryani",d:"Layered vegetable biryani with saffron",c:"indian-rice",t:["lunch","dinner"],v:1,e:0,cal:440,p:12,cb:58,f:16,s:"2 cups biryani + raita",ig:["basmati rice","mixed vegetables","paneer","saffron","fried onions"],tg:["comfort-food","hyderabadi"],dairy:1,soy:0},
+  {id:210,n:"Paneer Fried Rice",d:"Indo-Chinese fried rice with paneer",c:"asian",t:["lunch","dinner"],v:1,e:0,cal:440,p:14,cb:52,f:20,s:"2 cups",ig:["rice","paneer","cabbage","carrots","soy sauce"],tg:["indo-chinese","quick"],dairy:1,soy:1},
+  {id:211,n:"Gobi Manchurian (Dry)",d:"Crispy cauliflower in tangy Indo-Chinese sauce",c:"asian",t:["snack"],v:1,e:0,cal:260,p:6,cb:24,f:16,s:"1 cup / 10 pieces",ig:["cauliflower","cornflour","soy sauce","chili sauce","garlic"],tg:["indo-chinese","crispy"],dairy:0,soy:1},
+  {id:212,n:"Kheer (Rice Pudding)",d:"Rice pudding with milk, cardamom, saffron, nuts",c:"indian-rice",t:["snack"],v:1,e:0,cal:220,p:6,cb:32,f:8,s:"1 small bowl (150ml)",ig:["rice","milk","sugar","cardamom","saffron","almonds"],tg:["sweet","dessert"],dairy:1,soy:0},
+  {id:213,n:"Gulab Jamun (2 pcs)",d:"Deep-fried milk dumplings in rose sugar syrup",c:"indian-roti",t:["snack"],v:1,e:0,cal:280,p:4,cb:40,f:12,s:"2 gulab jamuns",ig:["khoya","maida","sugar","rose water","cardamom","ghee"],tg:["sweet","dessert"],dairy:1,soy:0},
+  {id:214,n:"Gajar ka Halwa",d:"Grated carrot dessert with milk, ghee, nuts",c:"indian-roti",t:["snack"],v:1,e:0,cal:250,p:4,cb:30,f:14,s:"1 small bowl (100g)",ig:["carrots","milk","ghee","sugar","almonds","cardamom"],tg:["sweet","dessert"],dairy:1,soy:0},
+  {id:215,n:"Mutton Biryani (Hyderabadi)",d:"Rich layered mutton biryani with aromatic spices",c:"indian-rice",t:["lunch","dinner"],v:0,e:0,cal:620,p:30,cb:56,f:28,s:"2 cups biryani + raita",ig:["mutton","basmati rice","yogurt","saffron","fried onions"],tg:["high-protein","hyderabadi"],dairy:1,soy:0},
+  {id:216,n:"Chicken Shawarma Wrap",d:"Spiced grilled chicken in rumali roti with garlic sauce",c:"mediterranean",t:["lunch","snack"],v:0,e:0,cal:420,p:24,cb:36,f:20,s:"1 wrap",ig:["chicken","rumali roti","garlic sauce","pickles","lettuce"],tg:["high-protein","street-food"],dairy:0,soy:0},
+  {id:217,n:"Egg Fried Rice (Indo-Chinese)",d:"Wok-fried rice with eggs, veggies, soy-chili",c:"asian",t:["lunch","dinner"],v:0,e:1,cal:440,p:14,cb:54,f:18,s:"2 cups",ig:["rice","eggs","cabbage","carrots","soy sauce"],tg:["indo-chinese","quick"],dairy:0,soy:1},
+  {id:218,n:"Butter Roti with Sabzi",d:"Ghee-brushed roti with mixed veg sabzi and pickle",c:"indian-roti",t:["lunch","dinner"],v:1,e:0,cal:300,p:8,cb:38,f:12,s:"2 rotis + 1 cup sabzi + pickle",ig:["wheat flour","ghee","mixed vegetables","pickle"],tg:["simple","everyday"],dairy:1,soy:0},
+  {id:219,n:"Aloo Dum with Rice",d:"Baby potatoes in spiced gravy with rice",c:"indian-rice",t:["lunch","dinner"],v:1,e:0,cal:420,p:8,cb:62,f:14,s:"1.5 cups rice + 1 cup aloo dum",ig:["potato","basmati rice","tomato","yogurt","spices"],tg:["comfort-food"],dairy:1,soy:0},
+  {id:220,n:"Masala Maggi with Vegetables",d:"Spiced-up Maggi with extra veggies and cheese",c:"asian",t:["snack","breakfast"],v:1,e:0,cal:320,p:9,cb:42,f:13,s:"1 pack cooked with veggies",ig:["instant noodles","onion","tomato","peas","cheese"],tg:["quick","comfort-food"],dairy:1,soy:0},
+  // ── PROTEIN-FOCUSED MEALS (new for v2) ──
+  {id:221,n:"Soy Chunk Curry with Roti",d:"High-protein soy chunks in spiced onion-tomato gravy with 2 rotis",c:"indian-roti",t:["lunch","dinner"],v:1,e:0,cal:420,p:32,cb:42,f:14,s:"2 rotis + 1 cup soy curry",ig:["soy chunks","onion","tomato","wheat flour","spices"],tg:["high-protein","meal-prep-friendly"],dairy:0,soy:1},
+  {id:222,n:"Soy Keema with Roti",d:"Minced soy granules cooked like keema with peas, 2 rotis",c:"indian-roti",t:["lunch","dinner"],v:1,e:0,cal:400,p:30,cb:40,f:12,s:"2 rotis + 1 cup soy keema",ig:["soy granules","peas","onion","wheat flour","garam masala"],tg:["high-protein","meat-alternative"],dairy:0,soy:1},
+  {id:223,n:"Tofu Bhurji with Roti",d:"Scrambled tofu with onion, tomato and spices, 2 rotis",c:"indian-roti",t:["breakfast","lunch"],v:1,e:0,cal:380,p:22,cb:38,f:16,s:"2 rotis + 1 cup tofu bhurji",ig:["tofu","onion","tomato","turmeric","wheat flour","spices"],tg:["high-protein","quick"],dairy:0,soy:1},
+  {id:224,n:"Double Egg Omelette with Toast",d:"3-egg masala omelette with cheese on wheat toast",c:"continental",t:["breakfast"],v:0,e:1,cal:420,p:28,cb:24,f:24,s:"3 eggs + cheese + 2 toast",ig:["eggs","cheese","onion","green chili","wheat bread","butter"],tg:["high-protein","quick"],dairy:1,soy:0},
+  {id:225,n:"Chicken Breast Salad Bowl",d:"Grilled chicken breast over quinoa with veggies and lemon dressing",c:"salad-bowl",t:["lunch","dinner"],v:0,e:0,cal:420,p:38,cb:32,f:14,s:"200g chicken + 1 cup quinoa + veggies",ig:["chicken breast","quinoa","cucumber","tomato","lemon","olive oil"],tg:["high-protein","low-fat","meal-prep-friendly"],dairy:0,soy:0},
+  {id:226,n:"Paneer & Sprouts Salad",d:"High-protein salad with paneer cubes, mixed sprouts, and lemon dressing",c:"indian-roti",t:["lunch","snack"],v:1,e:0,cal:280,p:22,cb:16,f:16,s:"1 large bowl",ig:["paneer","mixed sprouts","cucumber","tomato","lemon","chaat masala"],tg:["high-protein","low-carb","fresh"],dairy:1,soy:0},
+  {id:227,n:"Egg White Bhurji with Roti",d:"Egg whites scrambled with veggies, 2 rotis — low fat, high protein",c:"indian-roti",t:["breakfast"],v:0,e:1,cal:300,p:24,cb:34,f:8,s:"6 egg whites + 2 rotis",ig:["egg whites","onion","tomato","green chili","wheat flour"],tg:["high-protein","low-fat"],dairy:0,soy:0},
+  {id:228,n:"Whey Protein Oats Bowl",d:"Rolled oats cooked with milk, mixed with whey protein and banana",c:"continental",t:["breakfast"],v:1,e:0,cal:380,p:32,cb:44,f:8,s:"1 cup oats + 1 scoop whey + banana",ig:["rolled oats","whey protein","milk","banana","cinnamon"],tg:["high-protein","quick"],dairy:1,soy:0},
+  {id:229,n:"Greek Yogurt Parfait",d:"Layered Greek yogurt with granola, mixed berries, and honey",c:"continental",t:["breakfast","snack"],v:1,e:0,cal:280,p:18,cb:34,f:8,s:"1 cup yogurt + granola + berries",ig:["Greek yogurt","granola","mixed berries","honey","chia seeds"],tg:["high-protein","quick"],dairy:1,soy:0},
+  {id:230,n:"Tandoori Chicken Salad",d:"Smoky tandoori chicken pieces over fresh salad with mint yogurt",c:"salad-bowl",t:["lunch","dinner"],v:0,e:0,cal:350,p:34,cb:12,f:18,s:"200g chicken + salad + dressing",ig:["chicken","yogurt","lettuce","cucumber","tomato","mint"],tg:["high-protein","low-carb"],dairy:1,soy:0},
+  {id:231,n:"Sattu Paratha",d:"High-protein roasted gram flour stuffed paratha with chutney and curd",c:"indian-roti",t:["breakfast","lunch"],v:1,e:0,cal:360,p:16,cb:40,f:14,s:"2 sattu parathas + curd",ig:["wheat flour","sattu","onion","green chili","curd","ghee"],tg:["high-protein","bihari-style"],dairy:1,soy:0},
+  {id:232,n:"Peanut Butter Banana Toast",d:"Whole wheat toast with peanut butter, banana slices, and chia seeds",c:"continental",t:["breakfast","snack"],v:1,e:0,cal:320,p:12,cb:36,f:16,s:"2 slices toast",ig:["whole wheat bread","peanut butter","banana","chia seeds"],tg:["high-protein","quick"],dairy:0,soy:0},
+  {id:233,n:"Chana Dal with Rice",d:"Split chickpea dal with rice — highest protein among dals",c:"indian-rice",t:["lunch","dinner"],v:1,e:0,cal:420,p:18,cb:62,f:8,s:"1.5 cups rice + 1 cup chana dal",ig:["chana dal","basmati rice","onion","tomato","cumin","turmeric"],tg:["high-protein","high-fiber"],dairy:0,soy:0},
+  {id:234,n:"Soy Chunk Biryani",d:"Fragrant biryani made with protein-rich soy chunks",c:"indian-rice",t:["lunch","dinner"],v:1,e:0,cal:460,p:26,cb:56,f:14,s:"2 cups biryani + raita",ig:["soy chunks","basmati rice","yogurt","saffron","whole spices"],tg:["high-protein","meat-alternative"],dairy:1,soy:1},
+  {id:235,n:"Double Chicken Tikka Plate",d:"Extra portion grilled chicken tikka with salad and mint chutney",c:"indian-roti",t:["dinner","snack"],v:0,e:0,cal:360,p:42,cb:8,f:18,s:"250g chicken tikka + salad",ig:["chicken breast","yogurt","spices","mint chutney","salad"],tg:["high-protein","low-carb","grilled"],dairy:1,soy:0},
+  {id:236,n:"Masoor Dal with Roti",d:"Red lentil dal (fastest-cooking, high protein) with 2 rotis",c:"indian-roti",t:["lunch","dinner"],v:1,e:0,cal:370,p:16,cb:50,f:8,s:"2 rotis + 1 cup masoor dal",ig:["masoor dal","wheat flour","onion","tomato","garlic","cumin"],tg:["high-protein","quick","budget-friendly"],dairy:0,soy:0},
+  {id:237,n:"Protein Atta Roti with Paneer",d:"High-protein atta rotis (Aashirvaad Protein) with paneer sabzi",c:"indian-roti",t:["lunch","dinner"],v:1,e:0,cal:440,p:26,cb:38,f:22,s:"2 protein rotis + 1 cup paneer sabzi",ig:["protein atta","paneer","onion","tomato","spices"],tg:["high-protein","protein-enriched"],dairy:1,soy:0},
+];
+
+// ════════════════════════════════════════════════════════════════
+// DATA: BLINKIT PROTEIN PRODUCTS (80+)
+// ════════════════════════════════════════════════════════════════
+const BLINKIT=[
+  // Ready-to-Drink Protein
+  {id:1,n:"Amul Protein Lassi",brand:"Amul",cat:"rtd",p:20,cal:140,cb:14,f:2,price:"₹40-50",serve:"200ml",v:1,dairy:1,soy:0},
+  {id:2,n:"Amul Protein Shake — Chocolate",brand:"Amul",cat:"rtd",p:20,cal:150,cb:16,f:3,price:"₹40-50",serve:"200ml",v:1,dairy:1,soy:0},
+  {id:3,n:"Amul Protein Shake — Badam",brand:"Amul",cat:"rtd",p:20,cal:160,cb:18,f:3,price:"₹40-50",serve:"200ml",v:1,dairy:1,soy:0},
+  {id:4,n:"Epigamia Protein Shake — Coffee",brand:"Epigamia",cat:"rtd",p:15,cal:120,cb:12,f:2,price:"₹60-80",serve:"180ml",v:1,dairy:1,soy:0},
+  {id:5,n:"Epigamia Protein Shake — Chocolate",brand:"Epigamia",cat:"rtd",p:15,cal:130,cb:14,f:2,price:"₹60-80",serve:"180ml",v:1,dairy:1,soy:0},
+  {id:6,n:"Epigamia Protein Shake — Mango",brand:"Epigamia",cat:"rtd",p:15,cal:130,cb:16,f:1,price:"₹60-80",serve:"180ml",v:1,dairy:1,soy:0},
+  {id:7,n:"MuscleBlaze Protein Shake RTD",brand:"MuscleBlaze",cat:"rtd",p:25,cal:160,cb:8,f:3,price:"₹120-150",serve:"250ml",v:1,dairy:1,soy:0},
+  {id:8,n:"Raw Pressery Protein Smoothie",brand:"Raw Pressery",cat:"rtd",p:12,cal:140,cb:18,f:3,price:"₹80-100",serve:"200ml",v:1,dairy:1,soy:0},
+  {id:9,n:"Ensure High Protein RTD",brand:"Abbott",cat:"rtd",p:25,cal:200,cb:20,f:4,price:"₹180-200",serve:"200ml",v:1,dairy:1,soy:0},
+  {id:10,n:"Protinex Protein Water",brand:"Protinex",cat:"rtd",p:10,cal:50,cb:2,f:0,price:"₹50-60",serve:"250ml",v:1,dairy:0,soy:0},
+  // High-Protein Dairy
+  {id:11,n:"Epigamia Greek Yogurt — Plain",brand:"Epigamia",cat:"dairy",p:9,cal:80,cb:4,f:3,price:"₹45-55",serve:"90g",v:1,dairy:1,soy:0},
+  {id:12,n:"Epigamia Greek Yogurt — Berry",brand:"Epigamia",cat:"dairy",p:8,cal:100,cb:12,f:2,price:"₹50-60",serve:"90g",v:1,dairy:1,soy:0},
+  {id:13,n:"Epigamia Greek Yogurt — Alphonso",brand:"Epigamia",cat:"dairy",p:8,cal:110,cb:14,f:2,price:"₹50-60",serve:"90g",v:1,dairy:1,soy:0},
+  {id:14,n:"Amul Greek Yogurt — Natural",brand:"Amul",cat:"dairy",p:8,cal:60,cb:3,f:2,price:"₹30-40",serve:"100g",v:1,dairy:1,soy:0},
+  {id:15,n:"Paneer — Amul (per 100g)",brand:"Amul",cat:"dairy",p:18,cal:265,cb:2,f:21,price:"₹70-90 per 200g",serve:"100g",v:1,dairy:1,soy:0},
+  {id:16,n:"Paneer — Mother Dairy (per 100g)",brand:"Mother Dairy",cat:"dairy",p:18,cal:260,cb:3,f:20,price:"₹65-85 per 200g",serve:"100g",v:1,dairy:1,soy:0},
+  {id:17,n:"Hung Curd / Thick Curd",brand:"Various",cat:"dairy",p:10,cal:80,cb:6,f:4,price:"₹30-40",serve:"100g",v:1,dairy:1,soy:0},
+  {id:18,n:"Amul Cheese Slice (per slice)",brand:"Amul",cat:"dairy",p:4,cal:65,cb:1,f:5,price:"₹5 per slice",serve:"20g slice",v:1,dairy:1,soy:0},
+  {id:19,n:"Britannia Cheese Slice (per slice)",brand:"Britannia",cat:"dairy",p:4,cal:60,cb:1,f:5,price:"₹5 per slice",serve:"20g slice",v:1,dairy:1,soy:0},
+  {id:20,n:"Cottage Cheese / Cream Cheese",brand:"Various",cat:"dairy",p:11,cal:98,cb:3,f:5,price:"₹50-70",serve:"100g",v:1,dairy:1,soy:0},
+  {id:21,n:"Amul Protein Buttermilk",brand:"Amul",cat:"dairy",p:10,cal:60,cb:4,f:1,price:"₹25-30",serve:"200ml",v:1,dairy:1,soy:0},
+  // Protein Bars & Snacks
+  {id:22,n:"The Whole Truth Protein Bar — Peanut Butter",brand:"TWT",cat:"bar",p:20,cal:220,cb:16,f:10,price:"₹140-160",serve:"52g bar",v:1,dairy:1,soy:0},
+  {id:23,n:"The Whole Truth Protein Bar — Coffee",brand:"TWT",cat:"bar",p:20,cal:215,cb:14,f:10,price:"₹140-160",serve:"52g bar",v:1,dairy:1,soy:0},
+  {id:24,n:"The Whole Truth Protein Bar — Cocoa",brand:"TWT",cat:"bar",p:20,cal:210,cb:15,f:9,price:"₹140-160",serve:"52g bar",v:1,dairy:1,soy:0},
+  {id:25,n:"Yoga Bar Protein Bar — Almond Fudge",brand:"Yoga Bar",cat:"bar",p:20,cal:280,cb:25,f:12,price:"₹120-140",serve:"60g bar",v:1,dairy:1,soy:0},
+  {id:26,n:"Yoga Bar Protein Bar — Choco Brownie",brand:"Yoga Bar",cat:"bar",p:20,cal:290,cb:24,f:13,price:"₹120-140",serve:"60g bar",v:1,dairy:1,soy:0},
+  {id:27,n:"MuscleBlaze Protein Bar — Choco Delight",brand:"MuscleBlaze",cat:"bar",p:22,cal:230,cb:18,f:8,price:"₹150-180",serve:"65g bar",v:1,dairy:1,soy:0},
+  {id:28,n:"RiteBite Max Protein Bar — Choco Fudge",brand:"RiteBite",cat:"bar",p:20,cal:190,cb:16,f:7,price:"₹100-120",serve:"50g bar",v:1,dairy:1,soy:0},
+  {id:29,n:"RiteBite Max Protein Chips",brand:"RiteBite",cat:"bar",p:10,cal:120,cb:12,f:5,price:"₹60-80",serve:"30g",v:1,dairy:0,soy:1},
+  {id:30,n:"Roasted Chana (per 50g)",brand:"Various",cat:"snack",p:10,cal:180,cb:26,f:3,price:"₹20-30",serve:"50g",v:1,dairy:0,soy:0},
+  {id:31,n:"Roasted Soy Nuts (per 50g)",brand:"Various",cat:"snack",p:18,cal:200,cb:12,f:9,price:"₹30-50",serve:"50g",v:1,dairy:0,soy:1},
+  {id:32,n:"Makhana — Roasted (per 50g)",brand:"Various",cat:"snack",p:5,cal:160,cb:18,f:5,price:"₹40-60",serve:"50g",v:1,dairy:0,soy:0},
+  {id:33,n:"Pintola Peanut Butter — Classic (2 tbsp)",brand:"Pintola",cat:"snack",p:8,cal:190,cb:6,f:14,price:"₹200-250 per jar",serve:"32g (2 tbsp)",v:1,dairy:0,soy:0},
+  {id:34,n:"MyFitness Peanut Butter — Chocolate (2 tbsp)",brand:"MyFitness",cat:"snack",p:8,cal:200,cb:8,f:14,price:"₹200-280 per jar",serve:"32g (2 tbsp)",v:1,dairy:0,soy:0},
+  {id:35,n:"TWT Protein Cookie — Choco Chip",brand:"TWT",cat:"bar",p:15,cal:170,cb:16,f:7,price:"₹80-100",serve:"40g",v:1,dairy:1,soy:0},
+  {id:36,n:"Yoga Bar Protein Cookie",brand:"Yoga Bar",cat:"bar",p:12,cal:160,cb:16,f:6,price:"₹60-80",serve:"40g",v:1,dairy:1,soy:0},
+  // Protein Powders
+  {id:37,n:"Optimum Nutrition Whey — Chocolate (1 scoop)",brand:"ON",cat:"powder",p:24,cal:120,cb:3,f:2,price:"₹70-80 per scoop",serve:"30g scoop",v:1,dairy:1,soy:0},
+  {id:38,n:"MuscleBlaze Biozyme Whey (1 scoop)",brand:"MuscleBlaze",cat:"powder",p:25,cal:130,cb:4,f:2,price:"₹60-70 per scoop",serve:"33g scoop",v:1,dairy:1,soy:0},
+  {id:39,n:"MyProtein Impact Whey (1 scoop)",brand:"MyProtein",cat:"powder",p:21,cal:103,cb:1,f:2,price:"₹50-60 per scoop",serve:"25g scoop",v:1,dairy:1,soy:0},
+  {id:40,n:"Nakpro Whey — Unflavored (1 scoop)",brand:"Nakpro",cat:"powder",p:26,cal:116,cb:2,f:1,price:"₹40-50 per scoop",serve:"30g scoop",v:1,dairy:1,soy:0},
+  {id:41,n:"OZiva Plant Protein (1 scoop)",brand:"OZiva",cat:"powder",p:20,cal:110,cb:4,f:2,price:"₹60-70 per scoop",serve:"30g scoop",v:1,dairy:0,soy:1},
+  {id:42,n:"Sattu Powder (per 50g)",brand:"Various",cat:"powder",p:10,cal:190,cb:30,f:3,price:"₹10-15 per serve",serve:"50g",v:1,dairy:0,soy:0},
+  // Protein-Enriched Foods
+  {id:43,n:"Aashirvaad Protein Atta (per roti)",brand:"ITC",cat:"enriched",p:5,cal:85,cb:14,f:1,price:"₹60-70 per kg",serve:"1 roti (30g atta)",v:1,dairy:0,soy:1},
+  {id:44,n:"Slurrp Farm Protein Pasta (per serve)",brand:"Slurrp Farm",cat:"enriched",p:15,cal:280,cb:42,f:4,price:"₹120-150 per pack",serve:"75g dry",v:1,dairy:0,soy:0},
+  {id:45,n:"The Whole Truth Protein Pasta (per serve)",brand:"TWT",cat:"enriched",p:18,cal:290,cb:38,f:5,price:"₹180-220 per pack",serve:"75g dry",v:1,dairy:0,soy:0},
+  {id:46,n:"Epigamia Protein Bread (2 slices)",brand:"Epigamia",cat:"enriched",p:10,cal:140,cb:18,f:4,price:"₹80-100 per loaf",serve:"2 slices (60g)",v:1,dairy:0,soy:1},
+  {id:47,n:"The Whole Truth Protein Bread (2 slices)",brand:"TWT",cat:"enriched",p:12,cal:150,cb:16,f:5,price:"₹120-140 per loaf",serve:"2 slices (60g)",v:1,dairy:0,soy:0},
+  {id:48,n:"Yoga Bar Protein Granola (per serve)",brand:"Yoga Bar",cat:"enriched",p:10,cal:200,cb:26,f:8,price:"₹180-220 per box",serve:"50g",v:1,dairy:0,soy:0},
+  {id:49,n:"Amul Protein Lassi (bottle)",brand:"Amul",cat:"enriched",p:20,cal:150,cb:16,f:2,price:"₹40-50",serve:"200ml",v:1,dairy:1,soy:0},
+  {id:50,n:"Epigamia Protein Smoothie",brand:"Epigamia",cat:"enriched",p:10,cal:120,cb:14,f:3,price:"₹60-80",serve:"180ml",v:1,dairy:1,soy:0},
+  // High-Protein Pantry Staples
+  {id:51,n:"Nutrela Soy Chunks (per 50g dry)",brand:"Nutrela",cat:"pantry",p:26,cal:170,cb:16,f:0.5,price:"₹5-8 per serve",serve:"50g dry → ~150g cooked",v:1,dairy:0,soy:1},
+  {id:52,n:"Nutrela Soy Granules (per 50g dry)",brand:"Nutrela",cat:"pantry",p:26,cal:170,cb:16,f:0.5,price:"₹5-8 per serve",serve:"50g dry",v:1,dairy:0,soy:1},
+  {id:53,n:"Moong Dal (per 50g dry)",brand:"Various",cat:"pantry",p:12,cal:170,cb:28,f:0.5,price:"₹6-8 per serve",serve:"50g dry",v:1,dairy:0,soy:0},
+  {id:54,n:"Masoor Dal (per 50g dry)",brand:"Various",cat:"pantry",p:12,cal:165,cb:28,f:0.5,price:"₹4-6 per serve",serve:"50g dry",v:1,dairy:0,soy:0},
+  {id:55,n:"Chana Dal (per 50g dry)",brand:"Various",cat:"pantry",p:11,cal:175,cb:30,f:2,price:"₹5-7 per serve",serve:"50g dry",v:1,dairy:0,soy:0},
+  {id:56,n:"Rajma (per 50g dry)",brand:"Various",cat:"pantry",p:11,cal:165,cb:28,f:0.5,price:"₹5-7 per serve",serve:"50g dry",v:1,dairy:0,soy:0},
+  {id:57,n:"Chole / Kabuli Chana (per 50g dry)",brand:"Various",cat:"pantry",p:10,cal:180,cb:30,f:3,price:"₹6-8 per serve",serve:"50g dry",v:1,dairy:0,soy:0},
+  {id:58,n:"Quinoa (per 50g dry)",brand:"Various",cat:"pantry",p:7,cal:180,cb:30,f:3,price:"₹25-35 per serve",serve:"50g dry",v:1,dairy:0,soy:0},
+  {id:59,n:"Rolled Oats (per 50g)",brand:"Various",cat:"pantry",p:7,cal:190,cb:33,f:3,price:"₹8-12 per serve",serve:"50g dry",v:1,dairy:0,soy:0},
+  {id:60,n:"Flaxseeds (per 15g)",brand:"Various",cat:"pantry",p:3,cal:80,cb:4,f:6,price:"₹5-8 per serve",serve:"1 tbsp (15g)",v:1,dairy:0,soy:0},
+  {id:61,n:"Chia Seeds (per 15g)",brand:"Various",cat:"pantry",p:3,cal:70,cb:6,f:4,price:"₹8-12 per serve",serve:"1 tbsp (15g)",v:1,dairy:0,soy:0},
+  {id:62,n:"Chicken Breast (per 100g)",brand:"Licious/FreshToHome",cat:"pantry",p:31,cal:165,cb:0,f:4,price:"₹40-50 per 100g",serve:"100g raw",v:0,dairy:0,soy:0},
+  {id:63,n:"Eggs (per egg)",brand:"Various",cat:"pantry",p:6,cal:70,cb:1,f:5,price:"₹6-8 per egg",serve:"1 large egg",v:0,dairy:0,soy:0},
+  {id:64,n:"Tofu — Firm (per 100g)",brand:"Morinaga/Local",cat:"pantry",p:12,cal:76,cb:2,f:5,price:"₹30-40 per 100g",serve:"100g",v:1,dairy:0,soy:1},
+  // Non-veg protein snacks
+  {id:65,n:"Licious Chicken Sausages (2 pcs)",brand:"Licious",cat:"snack",p:14,cal:180,cb:4,f:12,price:"₹80-100",serve:"2 sausages (80g)",v:0,dairy:0,soy:0},
+  {id:66,n:"Licious Chicken Seekh Kebab (2 pcs)",brand:"Licious",cat:"snack",p:16,cal:160,cb:6,f:8,price:"₹90-120",serve:"2 kebabs (80g)",v:0,dairy:0,soy:0},
+  // Milk-based protein
+  {id:67,n:"Amul Toned Milk (per 200ml)",brand:"Amul",cat:"dairy",p:6,cal:110,cb:10,f:4,price:"₹16-20",serve:"200ml",v:1,dairy:1,soy:0},
+  {id:68,n:"Double Toned Milk (per 200ml)",brand:"Various",cat:"dairy",p:6,cal:80,cb:10,f:2,price:"₹14-18",serve:"200ml",v:1,dairy:1,soy:0},
+  // More bars
+  {id:69,n:"Snickers Protein Bar",brand:"Mars",cat:"bar",p:18,cal:230,cb:20,f:10,price:"₹200-250",serve:"51g bar",v:1,dairy:1,soy:0},
+  {id:70,n:"Gritzo Protein Bar — Kids",brand:"Gritzo",cat:"bar",p:7,cal:120,cb:16,f:4,price:"₹50-60",serve:"30g bar",v:1,dairy:1,soy:0},
+  {id:71,n:"TWT Mini Protein Bar",brand:"TWT",cat:"bar",p:10,cal:110,cb:10,f:5,price:"₹60-80",serve:"27g bar",v:1,dairy:1,soy:0},
+  {id:72,n:"Yoga Bar Breakfast Protein Bar",brand:"Yoga Bar",cat:"bar",p:10,cal:200,cb:24,f:8,price:"₹50-60",serve:"50g bar",v:1,dairy:1,soy:0},
+  // Seeds & nuts measured protein
+  {id:73,n:"Pumpkin Seeds (per 30g)",brand:"Various",cat:"pantry",p:9,cal:170,cb:4,f:14,price:"₹20-30",serve:"30g",v:1,dairy:0,soy:0},
+  {id:74,n:"Almonds (per 30g / ~20 nuts)",brand:"Various",cat:"pantry",p:6,cal:170,cb:6,f:14,price:"₹25-35",serve:"30g",v:1,dairy:0,soy:0},
+  {id:75,n:"Cashews (per 30g / ~15 nuts)",brand:"Various",cat:"pantry",p:5,cal:165,cb:10,f:13,price:"₹25-35",serve:"30g",v:1,dairy:0,soy:0},
+  {id:76,n:"Walnuts (per 30g / ~7 halves)",brand:"Various",cat:"pantry",p:5,cal:195,cb:4,f:20,price:"₹30-45",serve:"30g",v:1,dairy:0,soy:0},
+  {id:77,n:"Sunflower Seeds (per 30g)",brand:"Various",cat:"pantry",p:6,cal:170,cb:6,f:14,price:"₹15-20",serve:"30g",v:1,dairy:0,soy:0},
+  // Canned/ready
+  {id:78,n:"Rajma — Canned (Del Monte)",brand:"Del Monte",cat:"pantry",p:8,cal:120,cb:20,f:1,price:"₹80-100",serve:"200g (half can)",v:1,dairy:0,soy:0},
+  {id:79,n:"Chickpeas — Canned",brand:"Various",cat:"pantry",p:7,cal:130,cb:22,f:2,price:"₹80-100",serve:"200g (half can)",v:1,dairy:0,soy:0},
+  {id:80,n:"Tuna in Water — Canned",brand:"Various",cat:"pantry",p:26,cal:120,cb:0,f:1,price:"₹120-160",serve:"100g",v:0,dairy:0,soy:0},
+  {id:81,n:"Amul High Protein Curd (400g)",brand:"Amul",cat:"dairy",p:30,cal:240,cb:20,f:6,price:"₹60-70",serve:"400g tub",v:1,dairy:1,soy:0},
+  {id:82,n:"Protinex Original (per serve)",brand:"Protinex",cat:"powder",p:15,cal:120,cb:14,f:2,price:"₹20-25 per serve",serve:"30g in milk",v:1,dairy:1,soy:1},
+];
+
+const BLINKIT_CATS={rtd:"Ready-to-Drink",dairy:"High-Protein Dairy",bar:"Protein Bars & Cookies",snack:"High-Protein Snacks",powder:"Protein Powders",enriched:"Protein-Enriched Foods",pantry:"Pantry Staples"};
+
+// ════════════════════════════════════════════════════════════════
+// DATA: PROTEIN BOOSTERS & SWAPS
+// ════════════════════════════════════════════════════════════════
+const BOOSTERS=[
+  {id:1,text:"Add 100g paneer to your lunch",extraP:18,extraCal:265,v:1,dairy:1,soy:0},
+  {id:2,text:"Add 2 boiled eggs as a side",extraP:12,extraCal:140,v:0,dairy:0,soy:0},
+  {id:3,text:"Add 1 scoop whey to morning oats",extraP:24,extraCal:120,v:1,dairy:1,soy:0},
+  {id:4,text:"Swap regular curd with Greek yogurt",extraP:8,extraCal:20,v:1,dairy:1,soy:0},
+  {id:5,text:"Add handful of roasted soy nuts (50g)",extraP:18,extraCal:200,v:1,dairy:0,soy:1},
+  {id:6,text:"Top dal with 50g soy granules",extraP:26,extraCal:170,v:1,dairy:0,soy:1},
+  {id:7,text:"Add 30g pumpkin seeds as topping",extraP:9,extraCal:170,v:1,dairy:0,soy:0},
+  {id:8,text:"Add a protein shake between meals",extraP:24,extraCal:150,v:1,dairy:1,soy:0},
+  {id:9,text:"Add 50g roasted chana as snack",extraP:10,extraCal:180,v:1,dairy:0,soy:0},
+  {id:10,text:"Add 2 tbsp peanut butter to toast",extraP:8,extraCal:190,v:1,dairy:0,soy:0},
+  {id:11,text:"Add 100g tofu to your stir-fry",extraP:12,extraCal:76,v:1,dairy:0,soy:1},
+  {id:12,text:"Add 1 scoop sattu to a glass of water",extraP:10,extraCal:190,v:1,dairy:0,soy:0},
+  {id:13,text:"Add a protein bar as evening snack",extraP:20,extraCal:220,v:1,dairy:1,soy:0},
+  {id:14,text:"Drink Amul Protein Lassi with lunch",extraP:20,extraCal:140,v:1,dairy:1,soy:0},
+  {id:15,text:"Add 3 egg whites to breakfast",extraP:10,extraCal:50,v:0,dairy:0,soy:0},
+];
+
+const SWAPS=[
+  {from:"Regular atta roti",to:"Protein atta roti (Aashirvaad)",extraP:3,unit:"per roti"},
+  {from:"Regular pasta",to:"Protein pasta (TWT / Slurrp Farm)",extraP:10,unit:"per serving"},
+  {from:"Regular bread",to:"Protein bread (Epigamia / TWT)",extraP:6,unit:"per 2 slices"},
+  {from:"White rice",to:"Quinoa",extraP:5,unit:"per cup cooked"},
+  {from:"Regular milk",to:"Amul Protein Lassi",extraP:14,unit:"per 200ml"},
+  {from:"Regular granola",to:"Yoga Bar Protein Granola",extraP:8,unit:"per serving"},
+  {from:"Regular curd",to:"Amul High Protein Curd",extraP:10,unit:"per 100g"},
+  {from:"Regular bread",to:"Whole wheat + PB toast",extraP:8,unit:"per 2 slices"},
+];
+
+// ════════════════════════════════════════════════════════════════
+// ALGORITHM (Protein-first)
+// ════════════════════════════════════════════════════════════════
+const SLOTS={
+  3:[{key:'breakfast',label:'Breakfast',types:['breakfast'],calPct:.30,protPct:.25},{key:'lunch',label:'Lunch',types:['lunch'],calPct:.40,protPct:.40},{key:'dinner',label:'Dinner',types:['dinner'],calPct:.30,protPct:.35}],
+  4:[{key:'breakfast',label:'Breakfast',types:['breakfast'],calPct:.25,protPct:.20},{key:'lunch',label:'Lunch',types:['lunch'],calPct:.35,protPct:.35},{key:'snack',label:'Snack',types:['snack'],calPct:.10,protPct:.15},{key:'dinner',label:'Dinner',types:['dinner'],calPct:.30,protPct:.30}],
+  5:[{key:'breakfast',label:'Breakfast',types:['breakfast'],calPct:.22,protPct:.18},{key:'morningSnack',label:'Morning Snack',types:['snack'],calPct:.08,protPct:.12},{key:'lunch',label:'Lunch',types:['lunch'],calPct:.30,protPct:.30},{key:'eveningSnack',label:'Evening Snack',types:['snack'],calPct:.10,protPct:.12},{key:'dinner',label:'Dinner',types:['dinner'],calPct:.30,protPct:.28}],
+  6:[{key:'breakfast',label:'Breakfast',types:['breakfast'],calPct:.20,protPct:.16},{key:'morningSnack',label:'Morning Snack',types:['snack'],calPct:.07,protPct:.10},{key:'lunch',label:'Lunch',types:['lunch'],calPct:.25,protPct:.26},{key:'afternoonSnack',label:'Afternoon Snack',types:['snack'],calPct:.08,protPct:.10},{key:'eveningSnack',label:'Evening Snack',types:['snack'],calPct:.10,protPct:.12},{key:'dinner',label:'Dinner',types:['dinner'],calPct:.30,protPct:.26}],
+};
+
+function filterMeals(pr){
+  return M.filter(m=>{
+    if(pr.dietType==='vegetarian'){if(!m.v)return false;if(m.e&&pr.eggPref==='no-egg')return false;}
+    if(pr.dietType==='eggetarian'){if(!m.v&&!m.e)return false;}
+    if(!pr.dairyOk&&m.dairy)return false;
+    if(!pr.soyOk&&m.soy)return false;
+    if(pr.cuisines.length>0&&!pr.cuisines.includes('mixed')){if(!pr.cuisines.includes(m.c))return false;}
+    return true;
+  });
+}
+
+function scoreM(m,tc,tp,favs){
+  // Protein-first scoring: protein match weighted 60%, calories 40%
+  const cd=Math.abs(m.cal-tc)/Math.max(tc,1);
+  const pd=Math.abs(m.p-tp)/Math.max(tp,1);
+  let s=cd*.40+pd*.60;
+  if(favs.has(m.id))s*=.85;
+  // Bonus for high-protein meals when protein target is high
+  if(tp>20&&m.p>=tp*.8)s*=.8;
+  return s;
+}
+
+function genDay(pr,favs=new Set(),excl=new Set()){
+  const fm=filterMeals(pr);
+  const slots=SLOTS[pr.numMeals]||SLOTS[4];
+  const plan=[];const used=new Set(excl);
+  let remCal=pr.calorieTarget,remProt=pr.proteinTarget;
+  for(let i=0;i<slots.length;i++){
+    const slot=slots[i],isLast=i===slots.length-1;
+    let cands=fm.filter(m=>m.t.some(t=>slot.types.includes(t))&&!used.has(m.id));
+    if(!cands.length)cands=fm.filter(m=>!used.has(m.id));
+    if(!cands.length)cands=fm;
+    const tc=isLast?Math.max(remCal,100):pr.calorieTarget*slot.calPct;
+    const tp=isLast?Math.max(remProt,5):pr.proteinTarget*slot.protPct;
+    const scored=cands.map(m=>({m,s:scoreM(m,tc,tp,favs)})).sort((a,b)=>a.s-b.s);
+    const topN=Math.min(5,scored.length);
+    const pick=scored[Math.floor(Math.random()*topN)].m;
+    plan.push({...pick,slotKey:slot.key,slotLabel:slot.label});
+    used.add(pick.id);remCal-=pick.cal;remProt-=pick.p;
+  }
+  return plan;
+}
+
+function swapMeal(plan,idx,pr,favs=new Set()){
+  const cur=plan[idx],used=new Set(plan.map(m=>m.id));
+  const fm=filterMeals(pr);const slots=SLOTS[pr.numMeals]||SLOTS[4];
+  let cands=fm.filter(m=>m.t.some(t=>{const sl=slots.find(s=>s.key===cur.slotKey);return sl&&sl.types.includes(t);})&&!used.has(m.id));
+  if(!cands.length)cands=fm.filter(m=>m.id!==cur.id);
+  const oCal=plan.reduce((s,m,i)=>i===idx?s:s+m.cal,0);
+  const oProt=plan.reduce((s,m,i)=>i===idx?s:s+m.p,0);
+  const tc=pr.calorieTarget-oCal,tp=pr.proteinTarget-oProt;
+  const scored=cands.map(m=>({m,s:scoreM(m,tc,tp,favs)})).sort((a,b)=>a.s-b.s);
+  const topN=Math.min(4,scored.length);
+  const pick=scored[Math.floor(Math.random()*topN)].m;
+  const np=[...plan];np[idx]={...pick,slotKey:cur.slotKey,slotLabel:cur.slotLabel};return np;
+}
+
+function genWeek(pr,favs=new Set()){
+  const wk=[],recent=new Set();
+  for(let d=0;d<7;d++){const dp=genDay(pr,favs,recent);wk.push(dp);dp.forEach(m=>recent.add(m.id));if(d>=2)wk[d-2].forEach(m=>recent.delete(m.id));}
+  return wk;
+}
+
+function calcTotals(plan){return plan.reduce((a,m)=>({cal:a.cal+m.cal,p:a.p+m.p,cb:a.cb+m.cb,f:a.f+m.f}),{cal:0,p:0,cb:0,f:0});}
+function devColor(actual,target){if(!target)return'green';const pct=Math.abs(actual-target)/target;return pct<=.1?'green':pct<=.2?'yellow':'red';}
+function buildGrocery(wp){const im=new Map();wp.forEach(dp=>dp.forEach(m=>m.ig.forEach(ig=>{const k=ig.toLowerCase().trim();im.set(k,(im.get(k)||0)+1);})));return[...im.entries()].sort((a,b)=>b[1]-a[1]).map(([name,count])=>({name,count}));}
+
+// Get protein boosters filtered by diet
+function getFilteredBoosters(pr){
+  return BOOSTERS.filter(b=>{
+    if(pr.dietType==='vegetarian'&&!b.v)return false;
+    if(pr.dietType==='eggetarian'&&!b.v)return false;
+    if(!pr.dairyOk&&b.dairy)return false;
+    if(!pr.soyOk&&b.soy)return false;
+    return true;
+  });
+}
+
+// ════════════════════════════════════════════════════════════════
+// STORAGE
+// ════════════════════════════════════════════════════════════════
+const PK='np2_prefs',FK='np2_favs',AK='np2_apikey',OK='np2_onboarded';
+function loadP(){try{const r=localStorage.getItem(PK);return r?JSON.parse(r):null;}catch{return null;}}
+function saveP(p){localStorage.setItem(PK,JSON.stringify(p));}
+function loadF(){try{const r=localStorage.getItem(FK);return r?new Set(JSON.parse(r)):new Set();}catch{return new Set();}}
+function saveF(s){localStorage.setItem(FK,JSON.stringify([...s]));}
+function loadAPI(){return localStorage.getItem(AK)||'';}
+function saveAPI(k){localStorage.setItem(AK,k);}
+function isOnboarded(){return localStorage.getItem(OK)==='1';}
+function setOnboarded(){localStorage.setItem(OK,'1');}
+
+// ════════════════════════════════════════════════════════════════
+// COMPONENTS
+// ════════════════════════════════════════════════════════════════
+
+const DEFAULT_PREFS={calorieTarget:1800,proteinTarget:120,carbPref:'moderate',fatPref:'moderate',dietType:'non-vegetarian',eggPref:'egg',dairyOk:true,soyOk:true,cuisines:['mixed'],numMeals:4,proteinGapMode:true};
+
+// ── Onboarding ──
+function Onboarding({onComplete}){
+  const[step,setStep]=useState(0);
+  const[pr,setPr]=useState(DEFAULT_PREFS);
+  const upd=(k,v)=>setPr(p=>({...p,[k]:v}));
+
+  const steps=[
+    // Step 0: Goals
+    ()=>(
+      <div className="space-y-6">
+        <div className="text-center mb-6">
+          <div className="text-4xl mb-2">🎯</div>
+          <h2 className="text-2xl font-extrabold text-bark-700">Set Your Goals</h2>
+          <p className="text-sm text-bark-400 mt-1">Protein is your PRIMARY goal. We'll optimize everything around it.</p>
+        </div>
+        <div>
+          <label className="block text-sm font-bold text-bark-600 mb-2">Calorie Target — <span className="text-spice-500">{pr.calorieTarget} kcal</span></label>
+          <input type="range" min={1200} max={3500} step={50} value={pr.calorieTarget} onChange={e=>upd('calorieTarget',+e.target.value)} className="w-full"/>
+          <div className="flex justify-between text-xs text-bark-400"><span>1200</span><span>3500</span></div>
+        </div>
+        <div className="relative">
+          <label className="block text-sm font-bold text-bark-600 mb-2">
+            💪 Protein Target — <span className="text-forest-600 text-lg">{pr.proteinTarget}g</span>
+            <span className="ml-2 text-xs bg-forest-50 text-forest-600 px-2 py-0.5 rounded-full font-medium">PRIMARY GOAL</span>
+          </label>
+          <input type="range" min={50} max={250} step={5} value={pr.proteinTarget} onChange={e=>upd('proteinTarget',+e.target.value)} className="w-full"/>
+          <div className="flex justify-between text-xs text-bark-400"><span>50g</span><span>250g</span></div>
+          <div className="mt-2 text-xs text-bark-400 bg-cream-200 rounded-lg p-2">
+            💡 For muscle building: ~1.6-2.2g per kg body weight. For a 70kg person that's 112-154g/day
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-bold text-bark-500 mb-1.5">Carb Preference</label>
+            {['low','moderate','none'].map(v=>(
+              <button key={v} onClick={()=>upd('carbPref',v)} className={`w-full mb-1 py-1.5 px-3 rounded-lg text-xs font-medium border transition-all ${pr.carbPref===v?'bg-forest-500 text-white border-forest-500':'bg-white text-bark-500 border-cream-200'}`}>
+                {v==='low'?'🥬 Low Carb':v==='moderate'?'⚖️ Moderate':'🍚 No Restriction'}
+              </button>
+            ))}
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-bark-500 mb-1.5">Fat Preference</label>
+            {['low','moderate','none'].map(v=>(
+              <button key={v} onClick={()=>upd('fatPref',v)} className={`w-full mb-1 py-1.5 px-3 rounded-lg text-xs font-medium border transition-all ${pr.fatPref===v?'bg-forest-500 text-white border-forest-500':'bg-white text-bark-500 border-cream-200'}`}>
+                {v==='low'?'🫒 Low Fat':v==='moderate'?'⚖️ Moderate':'🧈 No Restriction'}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    ),
+    // Step 1: Diet
+    ()=>(
+      <div className="space-y-5">
+        <div className="text-center mb-4">
+          <div className="text-4xl mb-2">🥗</div>
+          <h2 className="text-2xl font-extrabold text-bark-700">Diet Preferences</h2>
+        </div>
+        <div>
+          <label className="block text-sm font-bold text-bark-600 mb-2">Diet Type</label>
+          <div className="grid grid-cols-3 gap-2">
+            {[{v:'vegetarian',l:'🥬 Veg',s:'No meat/fish'},{v:'eggetarian',l:'🥚 Eggetarian',s:'Veg + eggs'},{v:'non-vegetarian',l:'🍗 Non-Veg',s:'Everything'}].map(o=>(
+              <button key={o.v} onClick={()=>upd('dietType',o.v)} className={`py-3 px-2 rounded-xl text-center border-2 transition-all ${pr.dietType===o.v?'bg-forest-500 text-white border-forest-500 shadow-md':'bg-white text-bark-600 border-cream-200 hover:border-forest-300'}`}>
+                <div className="text-lg font-bold">{o.l.split(' ')[0]}</div>
+                <div className="text-sm font-semibold">{o.l.split(' ').slice(1).join(' ')}</div>
+                <div className={`text-[10px] mt-1 ${pr.dietType===o.v?'text-forest-100':'text-bark-400'}`}>{o.s}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+        {pr.dietType==='vegetarian'&&(
+          <div className="anim-fi">
+            <label className="block text-sm font-bold text-bark-600 mb-2">Egg Preference</label>
+            <div className="flex gap-2">
+              {[{v:'egg',l:'🥚 Includes Egg'},{v:'no-egg',l:'🌱 Pure Veg'}].map(o=>(
+                <button key={o.v} onClick={()=>upd('eggPref',o.v)} className={`flex-1 py-2.5 rounded-lg text-sm font-medium border transition-all ${pr.eggPref===o.v?'bg-forest-500 text-white border-forest-500':'bg-white text-bark-600 border-cream-200'}`}>{o.l}</button>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-bold text-bark-600 mb-2">🥛 Dairy OK?</label>
+            <div className="flex gap-2">
+              {[true,false].map(v=>(
+                <button key={String(v)} onClick={()=>upd('dairyOk',v)} className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all ${pr.dairyOk===v?'bg-forest-500 text-white border-forest-500':'bg-white text-bark-600 border-cream-200'}`}>{v?'Yes':'No'}</button>
+              ))}
+            </div>
+            <p className="text-[10px] text-bark-400 mt-1">Affects paneer, whey, curd, yogurt</p>
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-bark-600 mb-2">🫘 Soy OK?</label>
+            <div className="flex gap-2">
+              {[true,false].map(v=>(
+                <button key={String(v)} onClick={()=>upd('soyOk',v)} className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-all ${pr.soyOk===v?'bg-forest-500 text-white border-forest-500':'bg-white text-bark-600 border-cream-200'}`}>{v?'Yes':'No'}</button>
+              ))}
+            </div>
+            <p className="text-[10px] text-bark-400 mt-1">Affects tofu, soy chunks, soy nuts</p>
+          </div>
+        </div>
+      </div>
+    ),
+    // Step 2: Cuisine
+    ()=>(
+      <div className="space-y-5">
+        <div className="text-center mb-4">
+          <div className="text-4xl mb-2">🍽️</div>
+          <h2 className="text-2xl font-extrabold text-bark-700">Pick Your Cuisines</h2>
+          <p className="text-sm text-bark-400 mt-1">Select all that you enjoy. We'll mix and match.</p>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {CUISINES.map(c=>{
+            const sel=pr.cuisines.includes(c.id);
+            return(
+              <button key={c.id} onClick={()=>{
+                setPr(p=>{
+                  if(c.id==='mixed')return{...p,cuisines:['mixed']};
+                  let nx=p.cuisines.filter(x=>x!=='mixed');
+                  nx=nx.includes(c.id)?nx.filter(x=>x!==c.id):[...nx,c.id];
+                  return{...p,cuisines:nx.length?nx:['mixed']};
+                });
+              }} className={`py-3 px-3 rounded-xl text-left border-2 transition-all ${sel?'bg-spice-50 text-spice-700 border-spice-400 shadow-sm':'bg-white text-bark-500 border-cream-200 hover:border-spice-200'}`}>
+                <span className="text-lg mr-1">{c.emoji}</span>
+                <span className="text-sm font-medium">{c.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    ),
+    // Step 3: Meal Structure
+    ()=>(
+      <div className="space-y-5">
+        <div className="text-center mb-4">
+          <div className="text-4xl mb-2">🕐</div>
+          <h2 className="text-2xl font-extrabold text-bark-700">Meal Structure</h2>
+        </div>
+        <div>
+          <label className="block text-sm font-bold text-bark-600 mb-2">Meals per Day</label>
+          <div className="grid grid-cols-4 gap-2">
+            {[{v:3,l:'3',s:'B/L/D'},{v:4,l:'4',s:'B/L/S/D'},{v:5,l:'5',s:'B/MS/L/ES/D'},{v:6,l:'6',s:'Frequent'}].map(o=>(
+              <button key={o.v} onClick={()=>upd('numMeals',o.v)} className={`py-3 px-2 rounded-xl text-center border-2 transition-all ${pr.numMeals===o.v?'bg-forest-500 text-white border-forest-500 shadow-md':'bg-white text-bark-600 border-cream-200'}`}>
+                <div className="text-2xl font-extrabold">{o.l}</div>
+                <div className={`text-[10px] ${pr.numMeals===o.v?'text-forest-100':'text-bark-400'}`}>{o.s}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${pr.proteinGapMode?'bg-forest-50 border-forest-400':'bg-white border-cream-200'}`} onClick={()=>upd('proteinGapMode',!pr.proteinGapMode)}>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-bold text-bark-700 text-sm flex items-center gap-2">
+                💪 "Bridge the Gap" Mode
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${pr.proteinGapMode?'bg-forest-500 text-white':'bg-cream-200 text-bark-400'}`}>{pr.proteinGapMode?'ON':'OFF'}</span>
+              </div>
+              <p className="text-xs text-bark-400 mt-1">Auto-suggest protein boosters if your meal plan falls short of your protein target</p>
+            </div>
+            <div className={`w-12 h-6 rounded-full transition-all ${pr.proteinGapMode?'bg-forest-500':'bg-cream-200'}`}>
+              <div className={`w-5 h-5 rounded-full bg-white shadow transition-all mt-0.5 ${pr.proteinGapMode?'ml-6':'ml-0.5'}`}/>
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
+  ];
+
+  return(
+    <div className="min-h-screen bg-cream-100 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 anim-fiu">
+        {/* Progress */}
+        <div className="flex gap-1.5 mb-6">
+          {[0,1,2,3].map(i=>(
+            <div key={i} className={`h-1.5 flex-1 rounded-full transition-all ${i<=step?'bg-forest-500':'bg-cream-200'}`}/>
+          ))}
+        </div>
+        <div className="text-[10px] text-bark-400 text-center mb-4">Step {step+1} of 4</div>
+
+        {steps[step]()}
+
+        <div className="flex justify-between mt-8">
+          {step>0?<button onClick={()=>setStep(s=>s-1)} className="px-5 py-2.5 text-sm font-semibold text-bark-500 bg-cream-100 rounded-xl hover:bg-cream-200 transition-all">← Back</button>:<div/>}
+          <button onClick={()=>{
+            if(step<3)setStep(s=>s+1);
+            else{saveP(pr);setOnboarded();onComplete(pr);}
+          }} className="px-6 py-2.5 text-sm font-bold bg-gradient-to-r from-forest-500 to-forest-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-all">
+            {step===3?'🚀 Generate My Plan':'Next →'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Meal Card ──
+function MealCard({meal,index,onSwap,onToggleFav,isFav}){
+  const mb=(l,val,u,clr)=>(<div className="text-center"><div className={`text-sm font-bold ${clr}`}>{val}{u}</div><div className="text-[10px] text-bark-400 uppercase">{l}</div></div>);
+  return(
+    <div className={`bg-white rounded-xl border border-cream-200 shadow-sm hover:shadow-md transition-all anim-fiu overflow-hidden`} style={{animationDelay:`${index*0.05}s`}}>
+      <div className="flex items-center justify-between px-4 py-2 bg-gradient-to-r from-cream-100 to-cream-50 border-b border-cream-200">
+        <span className="text-xs font-bold text-forest-600 uppercase tracking-wider">{meal.slotLabel}</span>
+        <div className="flex items-center gap-1.5">
+          <button onClick={onToggleFav} className="p-1 rounded-full hover:bg-cream-200 transition-colors"><span className={`text-base ${isFav?'':'grayscale opacity-40'}`}>{isFav?'❤️':'🤍'}</span></button>
+          <button onClick={onSwap} className="px-2 py-0.5 text-xs font-medium text-spice-600 bg-spice-50 rounded-md hover:bg-spice-100 border border-spice-200">🔄 Swap</button>
+        </div>
+      </div>
+      <div className="p-4">
+        <div className="flex items-start gap-2 mb-2">
+          <span className="text-xl mt-0.5">{CE[meal.c]||'🍽️'}</span>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-bold text-bark-700 text-sm leading-tight">{meal.n}</h3>
+            <p className="text-xs text-bark-400 mt-0.5">{meal.d}</p>
+          </div>
+        </div>
+        <div className="mb-3 px-2 py-1.5 bg-cream-50 rounded-lg">
+          <span className="text-[10px] font-semibold text-bark-500 uppercase">Portion: </span>
+          <span className="text-xs text-bark-600">{meal.s}</span>
+        </div>
+        <div className="grid grid-cols-4 gap-1 py-2 border-t border-cream-100">
+          {mb('Cal',meal.cal,'','text-spice-600')}
+          {mb('Protein',meal.p,'g','text-forest-600')}
+          {mb('Carbs',meal.cb,'g','text-blue-500')}
+          {mb('Fat',meal.f,'g','text-amber-500')}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Day Summary (with protein emphasis) ──
+function DaySummary({plan,prefs}){
+  const t=calcTotals(plan);
+  const CM={green:{bg:'bg-emerald-50',tx:'text-emerald-700',bd:'border-emerald-200',dot:'bg-emerald-400'},yellow:{bg:'bg-amber-50',tx:'text-amber-700',bd:'border-amber-200',dot:'bg-amber-400'},red:{bg:'bg-red-50',tx:'text-red-600',bd:'border-red-200',dot:'bg-red-400'}};
+  const MI=({label,actual,target,unit,isPrimary})=>{
+    const c=CM[devColor(actual,target)],d=actual-target,sg=d>0?'+':'';
+    return(
+      <div className={`flex-1 rounded-xl p-3 ${c.bg} border ${c.bd} text-center ${isPrimary?'ring-2 ring-forest-300 protein-glow':''}`}>
+        <div className={`${isPrimary?'text-xl':'text-lg'} font-bold ${c.tx}`}>{actual}{unit}</div>
+        <div className="text-[10px] text-bark-400 uppercase font-semibold mb-1">{label} {isPrimary&&'💪'}</div>
+        <div className="flex items-center justify-center gap-1"><div className={`w-1.5 h-1.5 rounded-full ${c.dot}`}/><span className={`text-[10px] font-medium ${c.tx}`}>{sg}{d}{unit}</span></div>
+      </div>
+    );
+  };
+  return(
+    <div className="bg-white rounded-xl border border-cream-200 shadow-sm p-4 anim-si">
+      <h3 className="text-xs font-bold text-bark-500 uppercase tracking-wider mb-3 text-center">Daily Summary</h3>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <MI label="Calories" actual={t.cal} target={prefs.calorieTarget} unit="" />
+        <MI label="Protein" actual={t.p} target={prefs.proteinTarget} unit="g" isPrimary={true} />
+        <MI label="Carbs" actual={t.cb} target={Math.round(prefs.calorieTarget*.45/4)} unit="g" />
+        <MI label="Fat" actual={t.f} target={Math.round(prefs.calorieTarget*.30/9)} unit="g" />
+      </div>
+    </div>
+  );
+}
+
+// ── Macro Chart ──
+function MacroChart({plan}){
+  const canvasRef=useRef(null);const chartRef=useRef(null);const t=calcTotals(plan);
+  useEffect(()=>{
+    if(!canvasRef.current)return;
+    if(chartRef.current)chartRef.current.destroy();
+    const pCal=t.p*4,cCal=t.cb*4,fCal=t.f*9,tot=pCal+cCal+fCal||1;
+    chartRef.current=new Chart(canvasRef.current,{type:'doughnut',data:{labels:[`Protein ${Math.round(pCal/tot*100)}%`,`Carbs ${Math.round(cCal/tot*100)}%`,`Fat ${Math.round(fCal/tot*100)}%`],datasets:[{data:[pCal,cCal,fCal],backgroundColor:['#4A7C59','#3B82F6','#F59E0B'],borderColor:['#FFFBF5','#FFFBF5','#FFFBF5'],borderWidth:3}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'bottom',labels:{padding:12,usePointStyle:true,pointStyleWidth:8,font:{size:11,family:'Inter'},color:'#2D1810'}}}}});
+    return()=>{if(chartRef.current)chartRef.current.destroy();};
+  },[t.p,t.cb,t.f]);
+  return(
+    <div className="bg-white rounded-xl border border-cream-200 shadow-sm p-4 anim-si">
+      <h3 className="text-xs font-bold text-bark-500 uppercase tracking-wider mb-3 text-center">Macro Split</h3>
+      <div style={{height:'200px'}}><canvas ref={canvasRef}/></div>
+      <div className="grid grid-cols-3 gap-2 mt-3 text-center">
+        <div><div className="text-sm font-bold text-forest-600">{t.p}g</div><div className="text-[10px] text-bark-400">Protein</div></div>
+        <div><div className="text-sm font-bold text-blue-500">{t.cb}g</div><div className="text-[10px] text-bark-400">Carbs</div></div>
+        <div><div className="text-sm font-bold text-amber-500">{t.f}g</div><div className="text-[10px] text-bark-400">Fat</div></div>
+      </div>
+    </div>
+  );
+}
+
+// ── Bridge the Gap Panel ──
+function BridgeTheGap({plan,prefs}){
+  const t=calcTotals(plan);
+  const gap=prefs.proteinTarget-t.p;
+  if(gap<=5)return(<div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center anim-si"><span className="text-lg">🎯</span><p className="text-sm font-bold text-emerald-700 mt-1">You've hit your protein target!</p><p className="text-xs text-emerald-600">{t.p}g of {prefs.proteinTarget}g — great job!</p></div>);
+
+  const boosters=getFilteredBoosters(prefs);
+  // Pick boosters that together bridge the gap
+  const selected=[];let remaining=gap;
+  for(const b of boosters){
+    if(remaining<=0)break;
+    if(b.extraP<=remaining+5){selected.push(b);remaining-=b.extraP;}
+  }
+
+  return(
+    <div className="bg-gradient-to-br from-spice-50 to-cream-100 border-2 border-spice-300 rounded-xl p-4 anim-si">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-2xl">💪</span>
+        <div>
+          <h3 className="font-bold text-bark-700 text-sm">Bridge the Protein Gap</h3>
+          <p className="text-xs text-spice-600">You need <strong>{gap}g more protein</strong> to hit your {prefs.proteinTarget}g target</p>
+        </div>
+      </div>
+      <div className="space-y-2">
+        {selected.map((b,i)=>(
+          <div key={b.id} className="flex items-center gap-3 bg-white rounded-lg p-3 border border-cream-200 anim-fiu" style={{animationDelay:`${i*0.05}s`}}>
+            <div className="w-8 h-8 rounded-full bg-forest-50 flex items-center justify-center text-forest-600 font-bold text-xs">+{b.extraP}g</div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-bark-700">{b.text}</p>
+              <p className="text-[10px] text-bark-400">+{b.extraCal} cal</p>
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* Protein Swaps */}
+      <div className="mt-4 pt-3 border-t border-spice-200">
+        <h4 className="text-xs font-bold text-bark-600 uppercase tracking-wider mb-2">🔄 Smart Protein Swaps</h4>
+        <div className="space-y-1.5">
+          {SWAPS.slice(0,4).map((sw,i)=>(
+            <div key={i} className="flex items-center gap-2 text-xs">
+              <span className="text-bark-400 line-through">{sw.from}</span>
+              <span className="text-forest-500">→</span>
+              <span className="text-bark-700 font-medium">{sw.to}</span>
+              <span className="text-forest-600 font-bold ml-auto">+{sw.extraP}g</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Blinkit Protein Store ──
+function BlinkitStore({prefs,onClose}){
+  const[cat,setCat]=useState('all');
+  const[search,setSearch]=useState('');
+  const filtered=BLINKIT.filter(b=>{
+    if(prefs.dietType==='vegetarian'&&!b.v)return false;
+    if(!prefs.dairyOk&&b.dairy)return false;
+    if(!prefs.soyOk&&b.soy)return false;
+    if(cat!=='all'&&b.cat!==cat)return false;
+    if(search&&!b.n.toLowerCase().includes(search.toLowerCase())&&!b.brand.toLowerCase().includes(search.toLowerCase()))return false;
+    return true;
+  });
+  return(
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4 anim-fi" onClick={onClose}>
+      <div className="bg-cream-50 rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl anim-fiu" onClick={e=>e.stopPropagation()}>
+        <div className="p-4 border-b border-cream-200">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-bold text-bark-700 text-lg">🛒 Protein Store <span className="text-xs font-normal text-bark-400">Blinkit / Zepto / Instamart</span></h2>
+            <button onClick={onClose} className="p-1.5 text-bark-400 hover:text-bark-600 hover:bg-cream-200 rounded-lg">✕</button>
+          </div>
+          <input type="text" placeholder="Search products..." value={search} onChange={e=>setSearch(e.target.value)} className="w-full px-3 py-2 text-sm border border-cream-200 rounded-lg bg-white focus:outline-none focus:border-forest-400"/>
+          <div className="flex gap-1.5 mt-2 overflow-x-auto scrollbar-hide">
+            {[{k:'all',l:'All'},...Object.entries(BLINKIT_CATS).map(([k,l])=>({k,l}))].map(o=>(
+              <button key={o.k} onClick={()=>setCat(o.k)} className={`flex-shrink-0 px-2.5 py-1 text-[10px] font-semibold rounded-full border transition-all ${cat===o.k?'bg-forest-500 text-white border-forest-500':'bg-white text-bark-500 border-cream-200'}`}>{o.l}</button>
+            ))}
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+          {filtered.map(b=>(
+            <div key={b.id} className="bg-white rounded-lg p-3 border border-cream-200 flex items-center gap-3">
+              <div className="w-12 h-12 rounded-lg bg-forest-50 flex items-center justify-center">
+                <span className="text-forest-600 font-extrabold text-sm">{b.p}g</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-sm font-semibold text-bark-700 truncate">{b.n}</h4>
+                <p className="text-[10px] text-bark-400">{b.brand} · {b.serve} · {b.cal} cal</p>
+                <p className="text-[10px] text-spice-600 font-medium">{b.price}</p>
+              </div>
+              <div className="text-right">
+                <div className="text-xs font-bold text-forest-600">{b.p}g P</div>
+                <div className="text-[10px] text-bark-400">{b.cb}g C · {b.f}g F</div>
+              </div>
+            </div>
+          ))}
+          {filtered.length===0&&<p className="text-center text-sm text-bark-400 py-8">No products found matching your filters.</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Photo Scanner ──
+function PhotoScanner({onClose}){
+  const[apiKey,setApiKey]=useState(loadAPI);
+  const[img,setImg]=useState(null);
+  const[preview,setPreview]=useState('');
+  const[result,setResult]=useState(null);
+  const[loading,setLoading]=useState(false);
+  const[error,setError]=useState('');
+  const fileRef=useRef(null);
+
+  const handleFile=e=>{
+    const file=e.target.files[0];
+    if(!file)return;
+    setImg(file);setResult(null);setError('');
+    const reader=new FileReader();
+    reader.onload=ev=>setPreview(ev.target.result);
+    reader.readAsDataURL(file);
+  };
+
+  const analyze=async()=>{
+    if(!apiKey){setError('Please enter your Claude API key');return;}
+    if(!preview){setError('Please upload a photo first');return;}
+    saveAPI(apiKey);setLoading(true);setError('');
+    try{
+      const base64=preview.split(',')[1];
+      const mediaType=img.type||'image/jpeg';
+      const resp=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        body:JSON.stringify({
+          model:'claude-haiku-4-5-20251001',
+          max_tokens:500,
+          messages:[{role:'user',content:[
+            {type:'image',source:{type:'base64',media_type:mediaType,data:base64}},
+            {type:'text',text:'Analyze this food photo. Return ONLY a JSON object with these fields: {"name": "meal name", "description": "brief description", "calories": number, "protein": number in grams, "carbs": number in grams, "fat": number in grams, "serving": "estimated portion size"}. Be accurate with Indian food portions. Return ONLY the JSON, no other text.'}
+          ]}],
+        }),
+      });
+      if(!resp.ok){const err=await resp.json();throw new Error(err.error?.message||'API error');}
+      const data=await resp.json();
+      const text=data.content[0].text;
+      const json=JSON.parse(text.replace(/```json\n?/,'').replace(/```/,''));
+      setResult(json);
+    }catch(err){
+      setError(err.message||'Failed to analyze. Check your API key and try again.');
+    }
+    setLoading(false);
+  };
+
+  return(
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4 anim-fi" onClick={onClose}>
+      <div className="bg-cream-50 rounded-t-2xl sm:rounded-2xl w-full max-w-md max-h-[85vh] flex flex-col shadow-2xl anim-fiu" onClick={e=>e.stopPropagation()}>
+        <div className="flex items-center justify-between p-4 border-b border-cream-200">
+          <h2 className="font-bold text-bark-700 text-lg">📸 Scan Your Meal</h2>
+          <button onClick={onClose} className="p-1.5 text-bark-400 hover:text-bark-600 rounded-lg">✕</button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-bark-500 mb-1">Claude API Key <span className="font-normal text-bark-400">(stored locally)</span></label>
+            <input type="password" value={apiKey} onChange={e=>setApiKey(e.target.value)} placeholder="sk-ant-..." className="w-full px-3 py-2 text-sm border border-cream-200 rounded-lg bg-white focus:outline-none focus:border-forest-400"/>
+          </div>
+          <div className="border-2 border-dashed border-cream-200 rounded-xl p-6 text-center cursor-pointer hover:border-forest-300 transition-colors" onClick={()=>fileRef.current?.click()}>
+            {preview?<img src={preview} className="max-h-48 mx-auto rounded-lg"/>:<><div className="text-4xl mb-2">📷</div><p className="text-sm text-bark-400">Tap to upload a meal photo</p></>}
+            <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleFile} className="hidden"/>
+          </div>
+          <button onClick={analyze} disabled={loading} className="w-full py-3 rounded-xl bg-gradient-to-r from-forest-500 to-forest-600 text-white font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-60">
+            {loading?<span className="flex items-center justify-center gap-2"><svg className="animate-spin h-5 w-5" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Analyzing...</span>:'🔍 Analyze Meal'}
+          </button>
+          {error&&<div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-600">{error}</div>}
+          {result&&(
+            <div className="bg-white rounded-xl border border-cream-200 p-4 anim-si">
+              <h3 className="font-bold text-bark-700 text-lg">{result.name}</h3>
+              <p className="text-xs text-bark-400 mb-3">{result.description}</p>
+              <p className="text-xs text-bark-500 mb-3">📏 Serving: {result.serving}</p>
+              <div className="grid grid-cols-4 gap-2 text-center">
+                <div className="bg-spice-50 rounded-lg p-2"><div className="text-lg font-bold text-spice-600">{result.calories}</div><div className="text-[10px] text-bark-400">Cal</div></div>
+                <div className="bg-forest-50 rounded-lg p-2"><div className="text-lg font-bold text-forest-600">{result.protein}g</div><div className="text-[10px] text-bark-400">Protein</div></div>
+                <div className="bg-blue-50 rounded-lg p-2"><div className="text-lg font-bold text-blue-500">{result.carbs}g</div><div className="text-[10px] text-bark-400">Carbs</div></div>
+                <div className="bg-amber-50 rounded-lg p-2"><div className="text-lg font-bold text-amber-500">{result.fat}g</div><div className="text-[10px] text-bark-400">Fat</div></div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Grocery List ──
+function GroceryList({weekPlan,onClose}){
+  const[checked,setChecked]=useState(new Set());
+  const items=useMemo(()=>buildGrocery(weekPlan),[weekPlan]);
+  const tog=n=>setChecked(p=>{const nx=new Set(p);nx.has(n)?nx.delete(n):nx.add(n);return nx;});
+  const copy=()=>{const txt=items.map(i=>`${checked.has(i.name)?'✅':'⬜'} ${i.name} (×${i.count})`).join('\n');navigator.clipboard.writeText(`🛒 Weekly Grocery List\n\n${txt}`);};
+  return(
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4 anim-fi" onClick={onClose}>
+      <div className="bg-cream-50 rounded-t-2xl sm:rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col shadow-2xl anim-fiu" onClick={e=>e.stopPropagation()}>
+        <div className="flex items-center justify-between p-4 border-b border-cream-200">
+          <h2 className="font-bold text-bark-700 text-lg">🛒 Grocery List</h2>
+          <div className="flex gap-2"><button onClick={copy} className="px-3 py-1.5 text-xs font-medium bg-forest-50 text-forest-600 rounded-lg border border-forest-200">📋 Copy</button><button onClick={onClose} className="p-1.5 text-bark-400 hover:text-bark-600 rounded-lg">✕</button></div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-1">
+          {items.map(i=>(<label key={i.name} className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-all ${checked.has(i.name)?'bg-forest-50 border border-forest-200':'bg-white border border-cream-200'}`}><input type="checkbox" checked={checked.has(i.name)} onChange={()=>tog(i.name)} className="w-4 h-4 rounded text-forest-500"/><span className={`flex-1 text-sm ${checked.has(i.name)?'line-through text-bark-400':'text-bark-700'}`}>{i.name}</span><span className="text-[10px] text-bark-400 bg-cream-100 px-1.5 py-0.5 rounded">×{i.count}</span></label>))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Weekly View ──
+const DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+function WeeklyView({weekPlan,prefs,onSwapMeal,favorites,onToggleFav}){
+  const[ad,setAd]=useState(0);
+  if(!weekPlan||!weekPlan.length)return null;
+  const dp=weekPlan[ad];
+  return(
+    <div className="space-y-4">
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+        {weekPlan.map((day,i)=>{const t=calcTotals(day),cd=Math.abs(t.cal-prefs.calorieTarget)/prefs.calorieTarget,dc=cd<=.1?'bg-emerald-400':cd<=.2?'bg-amber-400':'bg-red-400';
+          return(<button key={i} onClick={()=>setAd(i)} className={`flex-shrink-0 px-4 py-2.5 rounded-lg text-center border transition-all ${i===ad?'bg-forest-500 text-white border-forest-500':'bg-white text-bark-500 border-cream-200'}`}><div className="text-xs font-bold">{DAYS[i].slice(0,3)}</div><div className="flex items-center justify-center gap-1 mt-0.5"><span className={`w-1.5 h-1.5 rounded-full ${i===ad?'bg-white':dc}`}/><span className={`text-[10px] ${i===ad?'text-forest-100':'text-bark-400'}`}>{t.p}g P</span></div></button>);
+        })}
+      </div>
+      <h3 className="font-bold text-bark-700 text-lg">{DAYS[ad]}</h3>
+      <DaySummary plan={dp} prefs={prefs}/>
+      {prefs.proteinGapMode&&<BridgeTheGap plan={dp} prefs={prefs}/>}
+      <div className="grid gap-3">{dp.map((meal,i)=>(<MealCard key={`${ad}-${meal.id}-${i}`} meal={meal} index={i} onSwap={()=>onSwapMeal(ad,i)} onToggleFav={()=>onToggleFav(meal.id)} isFav={favorites.has(meal.id)}/>))}</div>
+    </div>
+  );
+}
+
+// ── Sidebar Filters (compact) ──
+function Sidebar({prefs,setPrefs,onGenerate,isGen}){
+  const upd=(k,v)=>setPrefs(p=>({...p,[k]:v}));
+  return(
+    <div className="space-y-4">
+      <div>
+        <label className="block text-xs font-bold text-bark-500 mb-1">Calories — <span className="text-spice-500">{prefs.calorieTarget}</span></label>
+        <input type="range" min={1200} max={3500} step={50} value={prefs.calorieTarget} onChange={e=>upd('calorieTarget',+e.target.value)} className="w-full"/>
+      </div>
+      <div>
+        <label className="block text-xs font-bold text-bark-500 mb-1">💪 Protein — <span className="text-forest-600 font-extrabold">{prefs.proteinTarget}g</span></label>
+        <input type="range" min={50} max={250} step={5} value={prefs.proteinTarget} onChange={e=>upd('proteinTarget',+e.target.value)} className="w-full"/>
+      </div>
+      <div>
+        <label className="block text-xs font-bold text-bark-500 mb-1">Diet</label>
+        <div className="flex gap-1">{['vegetarian','eggetarian','non-vegetarian'].map(d=>(<button key={d} onClick={()=>upd('dietType',d)} className={`flex-1 py-1.5 text-[10px] font-semibold rounded-lg border transition-all ${prefs.dietType===d?'bg-forest-500 text-white border-forest-500':'bg-white text-bark-500 border-cream-200'}`}>{d==='vegetarian'?'Veg':d==='eggetarian'?'Egg':'Non-Veg'}</button>))}</div>
+      </div>
+      <div>
+        <label className="block text-xs font-bold text-bark-500 mb-1">Meals</label>
+        <div className="flex gap-1">{[3,4,5,6].map(n=>(<button key={n} onClick={()=>upd('numMeals',n)} className={`flex-1 py-1.5 text-sm font-bold rounded-lg border transition-all ${prefs.numMeals===n?'bg-forest-500 text-white border-forest-500':'bg-white text-bark-500 border-cream-200'}`}>{n}</button>))}</div>
+      </div>
+      <div className="grid grid-cols-2 gap-1">
+        {CUISINES.slice(0,10).map(c=>(<button key={c.id} onClick={()=>setPrefs(p=>{if(c.id==='mixed')return{...p,cuisines:['mixed']};let nx=p.cuisines.filter(x=>x!=='mixed');nx=nx.includes(c.id)?nx.filter(x=>x!==c.id):[...nx,c.id];return{...p,cuisines:nx.length?nx:['mixed']};})} className={`py-1.5 px-2 text-[10px] font-medium rounded-lg border truncate ${prefs.cuisines.includes(c.id)?'bg-spice-50 text-spice-700 border-spice-300':'bg-white text-bark-500 border-cream-200'}`}>{c.emoji} {c.label.replace('Indian — ','')}</button>))}
+      </div>
+      <button onClick={onGenerate} disabled={isGen} className="w-full py-3 rounded-xl bg-gradient-to-r from-forest-500 to-forest-600 text-white font-bold shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-60">
+        {isGen?'Generating...':'✨ Generate Plan'}
+      </button>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// MAIN APP
+// ════════════════════════════════════════════════════════════════
+function App(){
+  const[prefs,setPrefs]=useState(()=>loadP()||DEFAULT_PREFS);
+  const[onboarded,setOnboarded2]=useState(isOnboarded);
+  const[dayPlan,setDayPlan]=useState(null);
+  const[weekPlan,setWeekPlan]=useState(null);
+  const[favorites,setFavorites]=useState(()=>loadF());
+  const[viewMode,setViewMode]=useState('day');
+  const[showGrocery,setShowGrocery]=useState(false);
+  const[showBlinkit,setShowBlinkit]=useState(false);
+  const[showScanner,setShowScanner]=useState(false);
+  const[isGen,setIsGen]=useState(false);
+  const[mobFilters,setMobFilters]=useState(false);
+  const planRef=useRef(null);
+
+  useEffect(()=>{saveP(prefs);},[prefs]);
+  useEffect(()=>{saveF(favorites);},[favorites]);
+
+  const toggleFav=useCallback(id=>setFavorites(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;}),[]);
+
+  const handleGen=useCallback(()=>{
+    setIsGen(true);
+    setTimeout(()=>{
+      if(viewMode==='day')setDayPlan(genDay(prefs,favorites));
+      else setWeekPlan(genWeek(prefs,favorites));
+      setIsGen(false);setMobFilters(false);
+      setTimeout(()=>planRef.current?.scrollIntoView({behavior:'smooth',block:'start'}),100);
+    },300);
+  },[prefs,favorites,viewMode]);
+
+  const handleSwapDay=useCallback(i=>{if(dayPlan)setDayPlan(p=>swapMeal(p,i,prefs,favorites));},[dayPlan,prefs,favorites]);
+  const handleSwapWeek=useCallback((d,i)=>{if(weekPlan)setWeekPlan(p=>{const n=[...p];n[d]=swapMeal(n[d],i,prefs,favorites);return n;});},[weekPlan,prefs,favorites]);
+
+  const handleSave=async()=>{
+    try{const el=planRef.current;if(!el)return;const canvas=await html2canvas(el,{backgroundColor:'#FFFBF5',scale:2});const link=document.createElement('a');link.download=`meal-plan-${new Date().toISOString().slice(0,10)}.png`;link.href=canvas.toDataURL();link.click();}
+    catch{const plan=viewMode==='day'?dayPlan:(weekPlan?.[0]||[]);const txt=plan.map(m=>`${m.slotLabel}: ${m.n} (${m.cal}cal, ${m.p}g P)\n  ${m.s}`).join('\n\n');navigator.clipboard.writeText(`💪 NourishPlan Pro\n\n${txt}`);alert('Copied to clipboard!');}
+  };
+
+  const handleOnboard=(p)=>{setPrefs(p);setOnboarded2(true);};
+
+  // Auto-generate on first visit after onboarding
+  useEffect(()=>{
+    if(onboarded&&!dayPlan&&!weekPlan){
+      setTimeout(()=>{setDayPlan(genDay(prefs,favorites));},200);
+    }
+  },[onboarded]);
+
+  if(!onboarded)return <Onboarding onComplete={handleOnboard}/>;
+
+  const hasPlan=viewMode==='day'?!!dayPlan:!!weekPlan;
+
+  return(
+    <div className="min-h-screen bg-cream-100">
+      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-cream-200 shadow-sm">
+        <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">💪</span>
+            <div><h1 className="text-base font-extrabold text-bark-700 tracking-tight">NourishPlan <span className="text-forest-500">Pro</span></h1><p className="text-[9px] text-bark-400 -mt-0.5">Protein-First Meal Planner</p></div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button onClick={()=>setShowScanner(true)} className="px-2.5 py-1.5 text-xs font-semibold bg-pro-50 text-pro-600 rounded-lg border border-pro-200 hover:bg-pro-100 transition-all hidden sm:block">📸 Scan</button>
+            <button onClick={()=>setShowBlinkit(true)} className="px-2.5 py-1.5 text-xs font-semibold bg-forest-50 text-forest-600 rounded-lg border border-forest-200 hover:bg-forest-100 transition-all hidden sm:block">🛒 Protein Store</button>
+            <div className="hidden sm:flex bg-cream-100 rounded-lg p-0.5 border border-cream-200">
+              {['day','week'].map(m=>(<button key={m} onClick={()=>setViewMode(m)} className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${viewMode===m?'bg-white text-forest-600 shadow-sm':'text-bark-400'}`}>{m==='day'?'📅 Day':'📆 Week'}</button>))}
+            </div>
+            <button onClick={()=>setMobFilters(!mobFilters)} className="lg:hidden px-2.5 py-1.5 text-xs font-semibold bg-cream-100 text-bark-600 rounded-lg border border-cream-200">⚙️</button>
+          </div>
+        </div>
+        <div className="sm:hidden flex justify-center pb-2 gap-1">
+          <button onClick={()=>setShowScanner(true)} className="px-3 py-1 text-[10px] font-semibold bg-pro-50 text-pro-600 rounded-full">📸 Scan</button>
+          <button onClick={()=>setShowBlinkit(true)} className="px-3 py-1 text-[10px] font-semibold bg-forest-50 text-forest-600 rounded-full">🛒 Store</button>
+          {['day','week'].map(m=>(<button key={m} onClick={()=>setViewMode(m)} className={`px-3 py-1 text-[10px] font-semibold rounded-full ${viewMode===m?'bg-forest-500 text-white':'bg-cream-100 text-bark-400'}`}>{m==='day'?'📅 Day':'📆 Week'}</button>))}
+        </div>
+      </header>
+
+      <main className="max-w-6xl mx-auto px-4 py-6">
+        <div className="flex flex-col lg:flex-row gap-6">
+          <aside className={`lg:w-72 flex-shrink-0 ${mobFilters?'block':'hidden lg:block'}`}>
+            <div className="lg:sticky lg:top-24 bg-white rounded-2xl border border-cream-200 shadow-sm p-4">
+              <h2 className="text-xs font-bold text-bark-600 mb-3 flex items-center gap-2">⚙️ Preferences</h2>
+              <Sidebar prefs={prefs} setPrefs={setPrefs} onGenerate={handleGen} isGen={isGen}/>
+            </div>
+          </aside>
+
+          <div className="flex-1 min-w-0">
+            {!hasPlan?(
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <div className="text-6xl mb-4">💪</div>
+                <h2 className="text-xl font-bold text-bark-700 mb-2">Your protein-optimized plan is coming...</h2>
+                <div className="shimmer w-48 h-4 rounded mt-2"/>
+              </div>
+            ):(
+              <div ref={planRef} className="space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h2 className="text-lg font-bold text-bark-700">{viewMode==='day'?'📅 Your Day Plan':'📆 Weekly Plan'}</h2>
+                  <div className="flex gap-2 flex-wrap">
+                    <button onClick={handleGen} className="px-3 py-1.5 text-xs font-semibold bg-spice-50 text-spice-600 rounded-lg border border-spice-200">🔄 Regenerate</button>
+                    {viewMode==='week'&&weekPlan&&<button onClick={()=>setShowGrocery(true)} className="px-3 py-1.5 text-xs font-semibold bg-forest-50 text-forest-600 rounded-lg border border-forest-200">🛒 Grocery</button>}
+                    <button onClick={handleSave} className="px-3 py-1.5 text-xs font-semibold bg-blue-50 text-blue-600 rounded-lg border border-blue-200">💾 Save</button>
+                  </div>
+                </div>
+
+                {viewMode==='day'&&dayPlan&&(
+                  <>
+                    <DaySummary plan={dayPlan} prefs={prefs}/>
+                    {prefs.proteinGapMode&&<BridgeTheGap plan={dayPlan} prefs={prefs}/>}
+                    <div className="grid gap-3 lg:grid-cols-2">
+                      <div className="lg:col-span-2"><MacroChart plan={dayPlan}/></div>
+                      {dayPlan.map((meal,i)=>(<MealCard key={`${meal.id}-${i}`} meal={meal} index={i} onSwap={()=>handleSwapDay(i)} onToggleFav={()=>toggleFav(meal.id)} isFav={favorites.has(meal.id)}/>))}
+                    </div>
+                  </>
+                )}
+                {viewMode==='week'&&weekPlan&&<WeeklyView weekPlan={weekPlan} prefs={prefs} onSwapMeal={handleSwapWeek} favorites={favorites} onToggleFav={toggleFav}/>}
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+
+      {showGrocery&&weekPlan&&<GroceryList weekPlan={weekPlan} onClose={()=>setShowGrocery(false)}/>}
+      {showBlinkit&&<BlinkitStore prefs={prefs} onClose={()=>setShowBlinkit(false)}/>}
+      {showScanner&&<PhotoScanner onClose={()=>setShowScanner(false)}/>}
+      <footer className="text-center py-6 text-xs text-bark-400 border-t border-cream-200 mt-8">NourishPlan Pro — Protein-first planning. All data stored locally.</footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
