@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, lazy, Suspense } from 'react';
 import { Camera, ShoppingBag, FlaskConical, Zap, CalendarDays, Calendar, ShoppingCart, Download, RefreshCw, Settings, Bookmark, Heart, Save, SlidersHorizontal } from 'lucide-react';
 import { calcDayTotals } from './utils/algorithm';
 import usePlanStore, { calcDayTotalsWithBoosters } from './store/usePlanStore';
@@ -7,20 +7,21 @@ import FilterPanel from './components/FilterPanel';
 import MealCard from './components/MealCard';
 import MacroRings from './components/MacroRings';
 import ProteinTracker from './components/ProteinTracker';
-import WeeklyView from './components/WeeklyView';
-import GroceryList from './components/GroceryList';
 import BridgeTheGap from './components/BridgeTheGap';
-import BlinkitStore from './components/BlinkitStore';
-import PhotoScanner from './components/PhotoScanner';
-import ShakeBuilder from './components/ShakeBuilder';
-import RecipeModal from './components/RecipeModal';
-import SavePlanModal from './components/SavePlanModal';
-import ExportModal from './components/ExportModal';
-import SavedPlansView from './components/SavedPlansView';
-import SettingsView from './components/SettingsView';
 import GeneratingOverlay from './components/GeneratingOverlay';
-import QuickTargetsSheet from './components/QuickTargetsSheet';
 import DayTotalsBreakdown from './components/DayTotalsBreakdown';
+
+const WeeklyView = lazy(() => import('./components/WeeklyView'));
+const GroceryList = lazy(() => import('./components/GroceryList'));
+const BlinkitStore = lazy(() => import('./components/BlinkitStore'));
+const PhotoScanner = lazy(() => import('./components/PhotoScanner'));
+const ShakeBuilder = lazy(() => import('./components/ShakeBuilder'));
+const RecipeModal = lazy(() => import('./components/RecipeModal'));
+const SavePlanModal = lazy(() => import('./components/SavePlanModal'));
+const ExportModal = lazy(() => import('./components/ExportModal'));
+const SavedPlansView = lazy(() => import('./components/SavedPlansView'));
+const SettingsView = lazy(() => import('./components/SettingsView'));
+const QuickTargetsSheet = lazy(() => import('./components/QuickTargetsSheet'));
 
 function flattenWithBoosters(m) {
   const bc = (m.boosters || []).reduce((s, b) => s + (b.cal || 0), 0);
@@ -396,34 +397,36 @@ export default function App() {
                   )}
 
                   {planViewMode === 'week' && weekly && (
-                    <WeeklyView
-                      weekPlan={weekly.days.map(d => d.meals)}
-                      weekDays={weekly.days}
-                      prefs={prefs}
-                      onSwapMeal={doSwapWeekMeal}
-                      favorites={favSet}
-                      onToggleFav={toggleFavorite}
-                      onViewRecipe={(meal) => setActiveModal({ type: 'recipe', meal })}
-                      onAddBooster={(dayIdx, booster) => {
-                        const dayMeals = weekly.days[dayIdx].meals;
-                        const mealIdx = dayMeals.reduce((minI, m, i, arr) =>
-                          (m.protein < arr[minI].protein) ? i : minI, 0);
-                        addBoosterToWeekMeal(dayIdx, mealIdx, {
-                          text: booster.text, cal: booster.extraCal, protein: booster.extraProtein, carbs: 0, fat: 0,
-                        });
-                      }}
-                      onAddSwap={(dayIdx, swap) => {
-                        addWeekAddon(dayIdx, { type: 'swap', name: `${swap.from} → ${swap.to}`, cal: 0, protein: swap.extraProtein, carbs: 0, fat: 0, id: `addon_swap_${Date.now()}` });
-                      }}
-                      onAddShake={(dayIdx, shake) => {
-                        addWeekAddon(dayIdx, { type: 'shake', name: shake.name || 'Protein Shake', cal: Math.round(shake.macros.cal), protein: Math.round(shake.macros.protein), carbs: Math.round(shake.macros.carbs), fat: Math.round(shake.macros.fat), id: `addon_shake_${Date.now()}` });
-                      }}
-                      onAddProduct={(dayIdx, product) => {
-                        addWeekAddon(dayIdx, { type: 'product', name: `${product.name} (${product.brand})`, cal: product.calories, protein: product.protein, carbs: product.carbs || 0, fat: product.fat || 0, id: `addon_prod_${Date.now()}` });
-                      }}
-                      onRemoveBooster={(dayIdx, mealIdx, boosterId) => removeBoosterFromWeekMeal(dayIdx, mealIdx, boosterId)}
-                      onRemoveAddon={(dayIdx, addonId) => removeWeekAddon(dayIdx, addonId)}
-                    />
+                    <Suspense fallback={<div className="py-12 text-center text-bark-400">Loading weekly plan...</div>}>
+                      <WeeklyView
+                        weekPlan={weekly.days.map(d => d.meals)}
+                        weekDays={weekly.days}
+                        prefs={prefs}
+                        onSwapMeal={doSwapWeekMeal}
+                        favorites={favSet}
+                        onToggleFav={toggleFavorite}
+                        onViewRecipe={(meal) => setActiveModal({ type: 'recipe', meal })}
+                        onAddBooster={(dayIdx, booster) => {
+                          const dayMeals = weekly.days[dayIdx].meals;
+                          const mealIdx = dayMeals.reduce((minI, m, i, arr) =>
+                            (m.protein < arr[minI].protein) ? i : minI, 0);
+                          addBoosterToWeekMeal(dayIdx, mealIdx, {
+                            text: booster.text, cal: booster.extraCal, protein: booster.extraProtein, carbs: 0, fat: 0,
+                          });
+                        }}
+                        onAddSwap={(dayIdx, swap) => {
+                          addWeekAddon(dayIdx, { type: 'swap', name: `${swap.from} → ${swap.to}`, cal: 0, protein: swap.extraProtein, carbs: 0, fat: 0, id: `addon_swap_${Date.now()}` });
+                        }}
+                        onAddShake={(dayIdx, shake) => {
+                          addWeekAddon(dayIdx, { type: 'shake', name: shake.name || 'Protein Shake', cal: Math.round(shake.macros.cal), protein: Math.round(shake.macros.protein), carbs: Math.round(shake.macros.carbs), fat: Math.round(shake.macros.fat), id: `addon_shake_${Date.now()}` });
+                        }}
+                        onAddProduct={(dayIdx, product) => {
+                          addWeekAddon(dayIdx, { type: 'product', name: `${product.name} (${product.brand})`, cal: product.calories, protein: product.protein, carbs: product.carbs || 0, fat: product.fat || 0, id: `addon_prod_${Date.now()}` });
+                        }}
+                        onRemoveBooster={(dayIdx, mealIdx, boosterId) => removeBoosterFromWeekMeal(dayIdx, mealIdx, boosterId)}
+                        onRemoveAddon={(dayIdx, addonId) => removeWeekAddon(dayIdx, addonId)}
+                      />
+                    </Suspense>
                   )}
                 </div>
               )}
@@ -466,36 +469,42 @@ export default function App() {
             </div>
           </div>
         ) : activeView === 'saved' ? (
-          <SavedPlansView />
+          <Suspense fallback={<div className="p-8 text-center text-bark-400">Loading saved plans...</div>}>
+            <SavedPlansView />
+          </Suspense>
         ) : activeView === 'settings' ? (
-          <SettingsView />
+          <Suspense fallback={<div className="p-8 text-center text-bark-400">Loading settings...</div>}>
+            <SettingsView />
+          </Suspense>
         ) : null}
       </main>
 
       {/* ── All modals ── */}
-      {activeModal === 'grocery' && weekly && <GroceryList weekPlan={weekly.days.map(d => d.meals)} onClose={() => setActiveModal(null)} />}
-      {activeModal === 'blinkitStore' && <BlinkitStore prefs={prefs} onClose={() => setActiveModal(null)} onAddProduct={handleAddProduct} hasPlan={hasPlan} />}
-      {activeModal === 'scanner' && <PhotoScanner onClose={() => setActiveModal(null)} onSaveFood={(food) => addCustomFood(food)} />}
-      {activeModal === 'shakeBuilder' && <ShakeBuilder onClose={() => setActiveModal(null)} onSave={(shake) => saveShake(shake)} onEditShake={(shake) => editShake(shake.id, shake)} onDeleteShake={(id) => deleteShake(id)} onAddToPlan={handleAddShakeToPlan} hasPlan={hasPlan} savedShakes={savedShakes} />}
-      {activeModal?.type === 'recipe' && <RecipeModal meal={activeModal.meal} onClose={() => setActiveModal(null)} />}
-      {activeModal === 'savePlan' && <SavePlanModal onClose={() => setActiveModal(null)} />}
-      {activeModal === 'export' && <ExportModal onClose={() => setActiveModal(null)} />}
-      {activeModal === 'quickTargets' && (
-        <QuickTargetsSheet
-          prefs={prefs}
-          setPrefs={(updater) => {
-            if (typeof updater === 'function') {
-              const current = usePlanStore.getState().userPreferences;
-              setPreferences(updater(current));
-            } else {
-              setPreferences(updater);
-            }
-          }}
-          onGenerate={handleGenerate}
-          isGenerating={isGenerating}
-          onClose={() => setActiveModal(null)}
-        />
-      )}
+      <Suspense fallback={null}>
+        {activeModal === 'grocery' && weekly && <GroceryList weekPlan={weekly.days.map(d => d.meals)} onClose={() => setActiveModal(null)} />}
+        {activeModal === 'blinkitStore' && <BlinkitStore prefs={prefs} onClose={() => setActiveModal(null)} onAddProduct={handleAddProduct} hasPlan={hasPlan} />}
+        {activeModal === 'scanner' && <PhotoScanner onClose={() => setActiveModal(null)} onSaveFood={(food) => addCustomFood(food)} />}
+        {activeModal === 'shakeBuilder' && <ShakeBuilder onClose={() => setActiveModal(null)} onSave={(shake) => saveShake(shake)} onEditShake={(shake) => editShake(shake.id, shake)} onDeleteShake={(id) => deleteShake(id)} onAddToPlan={handleAddShakeToPlan} hasPlan={hasPlan} savedShakes={savedShakes} />}
+        {activeModal?.type === 'recipe' && <RecipeModal meal={activeModal.meal} onClose={() => setActiveModal(null)} />}
+        {activeModal === 'savePlan' && <SavePlanModal onClose={() => setActiveModal(null)} />}
+        {activeModal === 'export' && <ExportModal onClose={() => setActiveModal(null)} />}
+        {activeModal === 'quickTargets' && (
+          <QuickTargetsSheet
+            prefs={prefs}
+            setPrefs={(updater) => {
+              if (typeof updater === 'function') {
+                const current = usePlanStore.getState().userPreferences;
+                setPreferences(updater(current));
+              } else {
+                setPreferences(updater);
+              }
+            }}
+            onGenerate={handleGenerate}
+            isGenerating={isGenerating}
+            onClose={() => setActiveModal(null)}
+          />
+        )}
+      </Suspense>
 
       {isMainPlanView && (
         <button

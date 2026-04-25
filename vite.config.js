@@ -8,4 +8,15 @@ export default defineConfig({
     port: 8080,
     host: '0.0.0.0',
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          pdf: ['@react-pdf/renderer', 'html2canvas'],
+          icons: ['lucide-react'],
+        }
+      }
+    }
+  }
 })
