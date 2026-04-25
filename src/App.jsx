@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, lazy, Suspense } from 'react';
+import React, { useRef, useEffect, lazy, Suspense, useMemo } from 'react';
 import { Camera, ShoppingBag, FlaskConical, Zap, CalendarDays, Calendar, ShoppingCart, Download, RefreshCw, Settings, Bookmark, Heart, Save, SlidersHorizontal } from 'lucide-react';
 import { calcDayTotals } from './utils/algorithm';
 import usePlanStore, { calcDayTotalsWithBoosters } from './store/usePlanStore';
@@ -70,25 +70,25 @@ export default function App() {
   const hasPlan = planViewMode === 'day' ? !!daily : !!weekly;
   const favSet = new Set(favorites);
 
-  const augmentedPlanForTotals = daily ? [
+  const augmentedPlanForTotals = useMemo(() => daily ? [
     ...daily.meals,
     ...(daily.addons || []).map(a => ({ cal: a.cal, protein: a.protein, carbs: a.carbs, fat: a.fat, boosters: [] })),
-  ] : null;
+  ] : null, [daily]);
 
-  const flatPlan = augmentedPlanForTotals ? augmentedPlanForTotals.map(flattenWithBoosters) : null;
+  const flatPlan = useMemo(() => augmentedPlanForTotals ? augmentedPlanForTotals.map(flattenWithBoosters) : null, [augmentedPlanForTotals]);
 
   const weeklyDay0 = weekly?.days?.[0];
-  const weeklyFlatPlan = weeklyDay0 ? [
+  const weeklyFlatPlan = useMemo(() => weeklyDay0 ? [
     ...weeklyDay0.meals,
     ...(weeklyDay0.addons || []).map(a => ({ cal: a.cal, protein: a.protein, carbs: a.carbs, fat: a.fat, boosters: [] })),
-  ].map(flattenWithBoosters) : null;
+  ].map(flattenWithBoosters) : null, [weeklyDay0]);
 
   const trackerPlan = planViewMode === 'day' ? flatPlan : weeklyFlatPlan;
 
-  const addonTotals = (daily?.addons || []).reduce(
+  const addonTotals = useMemo(() => (daily?.addons || []).reduce(
     (acc, a) => ({ cal: acc.cal + a.cal, protein: acc.protein + a.protein, carbs: acc.carbs + a.carbs, fat: acc.fat + a.fat }),
     { cal: 0, protein: 0, carbs: 0, fat: 0 },
-  );
+  ), [daily?.addons]);
 
   // ── Handlers (same as original v1) ──
   const handleGenerate = () => {
