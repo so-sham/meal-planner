@@ -1,7 +1,8 @@
 import React, { useRef, useEffect, lazy, Suspense, useMemo } from 'react';
-import { Camera, ShoppingBag, FlaskConical, Zap, CalendarDays, Calendar, ShoppingCart, Download, RefreshCw, Settings, Bookmark, Heart, Save, SlidersHorizontal } from 'lucide-react';
+import { Camera, ShoppingBag, FlaskConical, Zap, CalendarDays, Calendar, ShoppingCart, Download, RefreshCw, Settings, Bookmark, Heart, Save, SlidersHorizontal, User, LogOut } from 'lucide-react';
 import { calcDayTotals } from './utils/algorithm';
 import usePlanStore, { calcDayTotalsWithBoosters } from './store/usePlanStore';
+import { useAuth } from './lib/AuthContext';
 import Onboarding from './components/Onboarding';
 import FilterPanel from './components/FilterPanel';
 import MealCard from './components/MealCard';
@@ -42,6 +43,8 @@ export default function App() {
     isGenerating, activeModal, setActiveModal, activeView, setActiveView,
     preferFavorites, setPreferFavorites, quickSavePlan,
   } = store;
+
+  const { user, openAuthModal, requireAuth, signOut } = useAuth();
 
   const planRef = useRef(null);
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
@@ -188,6 +191,29 @@ export default function App() {
               ))}
             </div>
 
+            {/* Auth button — login or user avatar */}
+            {user ? (
+              <button
+                onClick={signOut}
+                title={`Signed in as ${user.email} — click to sign out`}
+                className="flex items-center gap-1 min-h-[44px] min-w-[44px] sm:min-w-0 px-2.5 py-2 text-xs font-semibold bg-sage-50 text-sage-700 rounded-lg border border-sage-200 hover:bg-sage-100 transition-colors ml-1"
+              >
+                <div className="w-5 h-5 rounded-full bg-sage-500 text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                  {user.email?.[0]?.toUpperCase() || 'U'}
+                </div>
+                <span className="hidden sm:inline truncate max-w-[80px]">{user.email?.split('@')[0]}</span>
+              </button>
+            ) : (
+              <button
+                onClick={openAuthModal}
+                title="Sign in"
+                className="flex items-center gap-1 min-h-[44px] min-w-[44px] sm:min-w-0 px-2.5 py-2 text-xs font-semibold bg-white text-bark-600 rounded-lg border border-cream-200 hover:border-sage-300 hover:bg-sage-50 transition-colors ml-1"
+              >
+                <User size={14} aria-hidden />
+                <span className="hidden sm:inline">Sign in</span>
+              </button>
+            )}
+
             <button onClick={() => setSidebarOpen(!sidebarOpen)}
               className="lg:hidden flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold bg-cream-100 text-bark-600 rounded-lg border border-cream-200">
               <Settings size={14} />
@@ -322,7 +348,10 @@ export default function App() {
                       {planViewMode === 'day' ? '📅 Your day plan' : '📆 Weekly plan'}
                     </h2>
                     <div className="flex gap-1.5 flex-wrap">
-                      <button onClick={() => { quickSavePlan(); setShowSaved(true); setTimeout(() => setShowSaved(false), 2000); }}
+                      <button onClick={() => {
+                        const doSave = () => { quickSavePlan(); setShowSaved(true); setTimeout(() => setShowSaved(false), 2000); };
+                        if (requireAuth(doSave)) doSave();
+                      }}
                         className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
                           showSaved ? 'bg-sage-500 text-white border-sage-500' : 'bg-sage-50 text-sage-600 border-sage-200 hover:bg-sage-100'
                         }`}>
