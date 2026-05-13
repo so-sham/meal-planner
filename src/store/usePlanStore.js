@@ -77,24 +77,30 @@ const usePlanStore = create(
         set((s) => ({ userPreferences: { ...s.userPreferences, ...partial } })),
 
       completeOnboarding: () => {
-        const state = get();
-        const prefs = { ...state.userPreferences, onboardingComplete: true };
-        const plan = generateDayPlan(
-          prefs,
-          new Set(state.favorites),
-          new Set(),
-          state.customFoods,
-        );
-        const meals = plan.map((m) => ({ ...m, boosters: [], isSwapped: false, isPinned: false }));
-        // Single atomic set — avoids intermediate render with no plan
-        set({
-          userPreferences: prefs,
-          activePlan: {
-            ...state.activePlan,
-            daily: { date: todayKey(), meals, addons: [] },
-          },
-          planViewMode: 'day',
-        });
+        // Step 1: Mark onboarding complete + show generating overlay
+        set((s) => ({
+          userPreferences: { ...s.userPreferences, onboardingComplete: true },
+          isGenerating: true,
+        }));
+        // Step 2: Yield to browser so UI renders, then generate plan
+        setTimeout(() => {
+          const state = get();
+          const plan = generateDayPlan(
+            state.userPreferences,
+            new Set(state.favorites),
+            new Set(),
+            state.customFoods,
+          );
+          const meals = plan.map((m) => ({ ...m, boosters: [], isSwapped: false, isPinned: false }));
+          set({
+            activePlan: {
+              ...state.activePlan,
+              daily: { date: todayKey(), meals, addons: [] },
+            },
+            planViewMode: 'day',
+            isGenerating: false,
+          });
+        }, 50);
       },
 
       // ── Active Plan ──
