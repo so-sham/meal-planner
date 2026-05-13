@@ -48,26 +48,10 @@ export default function App() {
 
   const planRef = useRef(null);
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const [showSaved, setShowSaved] = React.useState(false);
+  const wasGenerating = useRef(false);
 
-  // ── Onboarding gate ──
-  if (!prefs.onboardingComplete) {
-    return (
-      <Onboarding
-        prefs={prefs}
-        setPrefs={(updater) => {
-          if (typeof updater === 'function') {
-            const current = usePlanStore.getState().userPreferences;
-            setPreferences(updater(current));
-          } else {
-            setPreferences(updater);
-          }
-        }}
-        onComplete={completeOnboarding}
-      />
-    );
-  }
-
-  // ── Derived data ──
+  // ── Derived data (hooks MUST be above conditional returns) ──
   const daily = activePlan.daily;
   const weekly = activePlan.weekly;
   const hasPlan = planViewMode === 'day' ? !!daily : !!weekly;
@@ -92,6 +76,37 @@ export default function App() {
     (acc, a) => ({ cal: acc.cal + a.cal, protein: acc.protein + a.protein, carbs: acc.carbs + a.carbs, fat: acc.fat + a.fat }),
     { cal: 0, protein: 0, carbs: 0, fat: 0 },
   ), [daily?.addons]);
+
+  useEffect(() => {
+    if (wasGenerating.current && !isGenerating && flatPlan && planViewMode === 'day') {
+      const t = calcDayTotals(flatPlan);
+      const gap = prefs.proteinTarget - t.protein;
+      if (gap > Math.max(10, prefs.proteinTarget * 0.08)) {
+        setTimeout(() => {
+          document.getElementById('bridge-the-gap')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 500);
+      }
+    }
+    wasGenerating.current = isGenerating;
+  }, [isGenerating, flatPlan, planViewMode, prefs.proteinTarget]);
+
+  // ── Onboarding gate (after all hooks) ──
+  if (!prefs.onboardingComplete) {
+    return (
+      <Onboarding
+        prefs={prefs}
+        setPrefs={(updater) => {
+          if (typeof updater === 'function') {
+            const current = usePlanStore.getState().userPreferences;
+            setPreferences(updater(current));
+          } else {
+            setPreferences(updater);
+          }
+        }}
+        onComplete={completeOnboarding}
+      />
+    );
+  }
 
   // ── Handlers (same as original v1) ──
   const handleGenerate = () => {
@@ -126,22 +141,6 @@ export default function App() {
     handleAddShake(shake);
     setActiveModal(null);
   };
-
-  const [showSaved, setShowSaved] = React.useState(false);
-  const wasGenerating = useRef(false);
-
-  useEffect(() => {
-    if (wasGenerating.current && !isGenerating && flatPlan && planViewMode === 'day') {
-      const t = calcDayTotals(flatPlan);
-      const gap = prefs.proteinTarget - t.protein;
-      if (gap > Math.max(10, prefs.proteinTarget * 0.08)) {
-        setTimeout(() => {
-          document.getElementById('bridge-the-gap')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }, 500);
-      }
-    }
-    wasGenerating.current = isGenerating;
-  }, [isGenerating, flatPlan, planViewMode, prefs.proteinTarget]);
 
   // ── Render active section ──
   // The plan view is the original v1 layout. Tracker/Saved/Settings are v2 additions.
