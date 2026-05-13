@@ -7,7 +7,14 @@ let _supabase = null;
 
 if (supabaseUrl && supabaseKey) {
   try {
-    _supabase = createClient(supabaseUrl, supabaseKey);
+    _supabase = createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        flowType: 'implicit',
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+      },
+    });
   } catch (err) {
     console.error('NourishPlan: Failed to initialize Supabase client:', err);
   }
