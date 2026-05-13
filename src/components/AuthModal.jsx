@@ -6,7 +6,7 @@ export default function AuthModal() {
   const { showAuthModal, closeAuthModal, sendOtp, verifyOtp } = useAuth();
   const [step, setStep] = useState('email'); // 'email' | 'otp'
   const [email, setEmail] = useState('');
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [otp, setOtp] = useState(['', '', '', '', '', '', '', '']);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -17,7 +17,7 @@ export default function AuthModal() {
   useEffect(() => {
     if (showAuthModal) {
       setStep('email');
-      setOtp(['', '', '', '', '', '']);
+      setOtp(['', '', '', '', '', '', '', '']);
       setError('');
       setMessage('');
       setLoading(false);
@@ -65,7 +65,7 @@ export default function AuthModal() {
       await sendOtp(email);
       setResendCooldown(60);
       setMessage('New code sent.');
-      setOtp(['', '', '', '', '', '']);
+      setOtp(['', '', '', '', '', '', '', '']);
       otpRefs.current[0]?.focus();
     } catch (err) {
       setError(err.message || 'Failed to resend code');
@@ -83,7 +83,7 @@ export default function AuthModal() {
       // Auth state change will close modal and run pending action
     } catch (err) {
       setError(err.message || 'Invalid code. Please try again.');
-      setOtp(['', '', '', '', '', '']);
+      setOtp(['', '', '', '', '', '', '', '']);
       otpRefs.current[0]?.focus();
     } finally {
       setLoading(false);
@@ -95,10 +95,10 @@ export default function AuthModal() {
     const newOtp = [...otp];
     newOtp[index] = digit;
     setOtp(newOtp);
-    if (digit && index < 5) otpRefs.current[index + 1]?.focus();
-    if (digit && index === 5) {
+    if (digit && index < 7) otpRefs.current[index + 1]?.focus();
+    if (digit && index === 7) {
       const code = newOtp.join('');
-      if (code.length === 6) handleVerifyOtp(code);
+      if (code.length === 8) handleVerifyOtp(code);
     }
   };
 
@@ -106,19 +106,19 @@ export default function AuthModal() {
     if (e.key === 'Backspace' && !otp[index] && index > 0) otpRefs.current[index - 1]?.focus();
     if (e.key === 'Enter') {
       const code = otp.join('');
-      if (code.length === 6) handleVerifyOtp(code);
+      if (code.length === 8) handleVerifyOtp(code);
     }
   };
 
   const handleOtpPaste = (e) => {
     e.preventDefault();
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 8);
     if (!pasted) return;
     const newOtp = [...otp];
-    for (let i = 0; i < 6; i++) newOtp[i] = pasted[i] || '';
+    for (let i = 0; i < 8; i++) newOtp[i] = pasted[i] || '';
     setOtp(newOtp);
-    if (pasted.length === 6) handleVerifyOtp(pasted);
-    else otpRefs.current[Math.min(pasted.length, 5)]?.focus();
+    if (pasted.length === 8) handleVerifyOtp(pasted);
+    else otpRefs.current[Math.min(pasted.length, 7)]?.focus();
   };
 
   return (
@@ -167,7 +167,7 @@ export default function AuthModal() {
               {loading ? 'Sending...' : 'Send code'}
             </button>
 
-            <p className="text-[10px] text-bark-400 text-center">No password needed. We'll email you a 6-digit code.</p>
+            <p className="text-[10px] text-bark-400 text-center">No password needed. We'll email you a verification code.</p>
           </form>
         ) : (
           <>
@@ -187,7 +187,7 @@ export default function AuthModal() {
                   value={digit}
                   onChange={(e) => handleOtpChange(i, e.target.value)}
                   onKeyDown={(e) => handleOtpKeyDown(i, e)}
-                  className="w-11 h-12 text-center text-lg font-bold border border-cream-200 rounded-xl bg-cream-50 focus:outline-none focus:border-sage-400 focus:ring-2 focus:ring-sage-300 transition-colors"
+                  className="w-9 h-11 text-center text-base font-bold border border-cream-200 rounded-lg bg-cream-50 focus:outline-none focus:border-sage-400 focus:ring-2 focus:ring-sage-300 transition-colors"
                 />
               ))}
             </div>
@@ -208,7 +208,7 @@ export default function AuthModal() {
             <div className="flex items-center justify-between mt-3 pt-3 border-t border-cream-200">
               <button
                 type="button"
-                onClick={() => { setStep('email'); setError(''); setMessage(''); setOtp(['', '', '', '', '', '']); }}
+                onClick={() => { setStep('email'); setError(''); setMessage(''); setOtp(['', '', '', '', '', '', '', '']); }}
                 className="text-xs text-bark-400 hover:text-bark-600"
               >
                 Change email
