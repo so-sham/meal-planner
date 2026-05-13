@@ -77,18 +77,18 @@ const usePlanStore = create(
         set((s) => ({ userPreferences: { ...s.userPreferences, ...partial } })),
 
       completeOnboarding: () => {
-        set((s) => ({
-          userPreferences: { ...s.userPreferences, onboardingComplete: true },
-        }));
         const state = get();
+        const prefs = { ...state.userPreferences, onboardingComplete: true };
         const plan = generateDayPlan(
-          state.userPreferences,
+          prefs,
           new Set(state.favorites),
           new Set(),
           state.customFoods,
         );
         const meals = plan.map((m) => ({ ...m, boosters: [], isSwapped: false, isPinned: false }));
+        // Single atomic set — avoids intermediate render with no plan
         set({
+          userPreferences: prefs,
           activePlan: {
             ...state.activePlan,
             daily: { date: todayKey(), meals, addons: [] },
