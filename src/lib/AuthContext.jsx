@@ -97,7 +97,7 @@ export function AuthProvider({ children }) {
     const { data, error } = await supabase.auth.verifyOtp({
       email,
       token,
-      type: 'email',
+      type: 'magiclink',
     });
     if (error) throw error;
     return data;
