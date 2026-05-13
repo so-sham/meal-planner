@@ -73,12 +73,14 @@ export function AuthProvider({ children }) {
 
   // Run pending action when user becomes available
   useEffect(() => {
-    if (user && pendingAction) {
-      pendingAction();
-      setPendingAction(null);
+    if (user && showAuthModal) {
+      if (pendingAction) {
+        pendingAction();
+        setPendingAction(null);
+      }
       setShowAuthModal(false);
     }
-  }, [user, pendingAction]);
+  }, [user, pendingAction, showAuthModal]);
 
   const sendOtp = async (email) => {
     if (!supabase) throw new Error('Supabase not configured');

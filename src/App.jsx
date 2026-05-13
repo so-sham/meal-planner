@@ -193,8 +193,8 @@ export default function App() {
             {/* Auth button — login or user avatar */}
             {user ? (
               <button
-                onClick={signOut}
-                title={`Signed in as ${user.email} — click to sign out`}
+                onClick={() => setActiveView('settings')}
+                title={`Signed in as ${user.email} — click to view settings`}
                 className="flex items-center gap-1 min-h-[44px] min-w-[44px] sm:min-w-0 px-2.5 py-2 text-xs font-semibold bg-sage-50 text-sage-700 rounded-lg border border-sage-200 hover:bg-sage-100 transition-colors ml-1"
               >
                 <div className="w-5 h-5 rounded-full bg-sage-500 text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">
