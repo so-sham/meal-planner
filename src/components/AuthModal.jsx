@@ -12,6 +12,8 @@ export default function AuthModal() {
   const [loading, setLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const otpRefs = useRef([]);
+  const verifyingRef = useRef(false);
+  const lastSubmitRef = useRef(0);
 
   // Reset state when modal opens
   useEffect(() => {
@@ -21,6 +23,8 @@ export default function AuthModal() {
       setError('');
       setMessage('');
       setLoading(false);
+      verifyingRef.current = false;
+      lastSubmitRef.current = 0;
     }
   }, [showAuthModal]);
 
@@ -75,6 +79,13 @@ export default function AuthModal() {
   };
 
   const handleVerifyOtp = async (code) => {
+    if (verifyingRef.current) return;
+    const now = Date.now();
+    if (now - lastSubmitRef.current < 500) return;
+    
+    lastSubmitRef.current = now;
+    verifyingRef.current = true;
+
     setError('');
     setMessage('');
     setLoading(true);
@@ -82,6 +93,7 @@ export default function AuthModal() {
       await verifyOtp(email, code);
       // Auth state change will close modal and run pending action
     } catch (err) {
+      verifyingRef.current = false;
       setError(err.message || 'Invalid code. Please try again.');
       setOtp(['', '', '', '', '', '']);
       otpRefs.current[0]?.focus();
