@@ -5,10 +5,9 @@ const AuthContext = createContext({
   user: null,
   session: null,
   loading: true,
-  signUp: async () => {},
-  signIn: async () => {},
+  sendOtp: async () => {},
+  verifyOtp: async () => {},
   signOut: async () => {},
-  resetPassword: async () => {},
 });
 
 export function AuthProvider({ children }) {
@@ -40,16 +39,22 @@ export function AuthProvider({ children }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email, password) => {
+  /** Send a 6-digit OTP to the user's email. Creates account if new. */
+  const sendOtp = async (email) => {
     if (!supabase) throw new Error('Supabase not configured');
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signInWithOtp({ email });
     if (error) throw error;
     return data;
   };
 
-  const signIn = async (email, password) => {
+  /** Verify the 6-digit OTP code the user received via email. */
+  const verifyOtp = async (email, token) => {
     if (!supabase) throw new Error('Supabase not configured');
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: 'email',
+    });
     if (error) throw error;
     return data;
   };
@@ -60,14 +65,8 @@ export function AuthProvider({ children }) {
     if (error) throw error;
   };
 
-  const resetPassword = async (email) => {
-    if (!supabase) throw new Error('Supabase not configured');
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
-    if (error) throw error;
-  };
-
   return (
-    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut, resetPassword }}>
+    <AuthContext.Provider value={{ user, session, loading, sendOtp, verifyOtp, signOut }}>
       {children}
     </AuthContext.Provider>
   );
